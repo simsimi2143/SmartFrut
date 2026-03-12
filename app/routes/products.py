@@ -9,6 +9,7 @@ products_bp = Blueprint('products', __name__)
 
 @products_bp.route('/')
 def listar():
+    print("Host header:", request.headers.get('Host'))
     productos = Producto.query.all()
     return render_template('gestion_productos.html', productos=productos)
 

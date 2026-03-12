@@ -10,14 +10,20 @@
 </head>
 <body class="bg-gray-100">
     <nav class="bg-green-600 p-4 text-white">
-        <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold"><i class="fas fa-apple-alt mr-2"></i>Fruteria</a>
-            <div>
-                <a href="/" class="mr-4 hover:underline"><i class="fas fa-shopping-cart"></i> Venta</a>
-                <a href="/productos" class="hover:underline"><i class="fas fa-boxes"></i> Gestión</a>
-            </div>
+    <div class="container mx-auto flex justify-between items-center">
+        <a href="{{ url_for('main.index') }}" class="text-2xl font-bold">
+            <i class="fas fa-apple-alt mr-2"></i>Fruteria
+        </a>
+        <div>
+            <a href="{{ url_for('main.index') }}" class="mr-4 hover:underline">
+                <i class="fas fa-shopping-cart"></i> Venta
+            </a>
+            <a href="{{ url_for('products.listar') }}" class="hover:underline">
+                <i class="fas fa-boxes"></i> Gestión
+            </a>
         </div>
-    </nav>
+    </div>
+</nav>
     <main class="container mx-auto p-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
