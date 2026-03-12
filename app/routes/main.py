@@ -1,6 +1,9 @@
 from flask import Blueprint, render_template, session, request, jsonify
 from app.models import Categoria, Producto, Venta, DetalleVenta
 from app.database.db import db
+from sqlalchemy import func # Importa esto al inicio del archivo
+
+
 
 main_bp = Blueprint('main', __name__)
 
@@ -92,3 +95,12 @@ def pagar():
     db.session.commit()
     session['carrito'] = []
     return jsonify({'success': True, 'total': total})
+
+@main_bp.route('/caja')
+def ver_caja():
+    # Sumamos la columna 'total' de todos los registros en la tabla Venta
+    total_obtenido = db.session.query(func.sum(Venta.total)).scalar() or 0
+    # Obtenemos la lista de ventas para mostrar el historial
+    ventas = Venta.query.order_by(Venta.fecha.desc()).all()
+    
+    return render_template('caja.html', total=total_obtenido, ventas=ventas)

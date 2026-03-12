@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Caja y Ventas{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Resumen de Caja</h1>
+    
+    <div class="bg-white p-6 rounded-lg shadow-md mb-8 border-l-8 border-green-500">
+        <h2 class="text-gray-500 uppercase tracking-wide text-sm font-bold">Total Recaudado</h2>
+        <p class="text-4xl font-black text-gray-800">€{{ "%.2f"|format(total) }}</p>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="p-4 font-bold text-gray-700">ID Venta</th>
+                    <th class="p-4 font-bold text-gray-700">Fecha y Hora</th>
+                    <th class="p-4 font-bold text-gray-700 text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for venta in ventas %}
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="p-4 text-gray-600">#{{ venta.id }}</td>
+                    <td class="p-4 text-gray-600">{{ venta.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="p-4 text-right font-bold text-green-600">€{{ "%.2f"|format(venta.total) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="p-8 text-center text-gray-500">No hay ventas registradas aún.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
