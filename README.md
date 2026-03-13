@@ -269,6 +269,14 @@ http://localhost:5000
 * Integración con impresoras térmicas
 
 ---
+# detalles de ejecutable 
+```
+dentro dist solo la carpeta run es la necesaria e independiete.
+
+```
+
+---
+
 
 # Autor
 
