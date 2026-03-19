@@ -1,6 +1,6 @@
 {% for producto in productos %}
 <div class="bg-gray-50 p-2 rounded shadow flex flex-col items-center">
-    <img src="{% if producto.imagen %}{{ url_for('static', filename='images/' + producto.imagen) }}{% else %}https://placehold.co/100x100{% endif %}" alt="{{ producto.nombre }}" class="w-20 h-20 object-cover mb-2">
+    <img src="{% if producto.imagen %}{{ url_for('main.uploaded_file', filename=producto.imagen) }}{% else %}https://placehold.co/100x100{% endif %}" alt="{{ producto.nombre }}" class="w-20 h-20 object-cover mb-2">
     <span class="font-semibold">{{ producto.nombre }}</span>
     <span class="text-sm text-gray-600">€{{ producto.precio }}</span>
     <button class="add-to-cart mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm" data-id="{{ producto.id }}" data-precio="{{ producto.precio }}">

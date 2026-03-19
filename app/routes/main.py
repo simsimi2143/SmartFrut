@@ -1,9 +1,9 @@
-from flask import Blueprint, render_template, session, request, jsonify
+from flask import Blueprint, render_template, session, request, jsonify, send_from_directory, abort
 from app.models import Categoria, Producto, Venta, DetalleVenta
 from app.database.db import db
-from sqlalchemy import func # Importa esto al inicio del archivo
-
-
+from sqlalchemy import func
+from config import Config
+import os
 
 main_bp = Blueprint('main', __name__)
 
@@ -80,7 +80,7 @@ def pagar():
     total = sum(item['subtotal'] for item in carrito)
     venta = Venta(total=total)
     db.session.add(venta)
-    db.session.flush()  # Para obtener el id de la venta
+    db.session.flush()
 
     for item in carrito:
         detalle = DetalleVenta(
@@ -98,9 +98,14 @@ def pagar():
 
 @main_bp.route('/caja')
 def ver_caja():
-    # Sumamos la columna 'total' de todos los registros en la tabla Venta
     total_obtenido = db.session.query(func.sum(Venta.total)).scalar() or 0
-    # Obtenemos la lista de ventas para mostrar el historial
     ventas = Venta.query.order_by(Venta.fecha.desc()).all()
-    
     return render_template('caja.html', total=total_obtenido, ventas=ventas)
+
+# Nueva ruta para servir imágenes desde UPLOAD_FOLDER
+@main_bp.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    # Seguridad: evitar directory traversal
+    if '..' in filename or filename.startswith('/'):
+        abort(404)
+    return send_from_directory(Config.UPLOAD_FOLDER, filename)

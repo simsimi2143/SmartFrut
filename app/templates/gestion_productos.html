@@ -19,7 +19,7 @@
         {% for producto in productos %}
         <tr class="border-t">
             <td class="p-2">
-                <img src="{% if producto.imagen %}{{ url_for('static', filename='images/' + producto.imagen) }}{% else %}https://placehold.co/50x50{% endif %}" class="w-12 h-12 object-cover">
+                <img src="{% if producto.imagen %}{{ url_for('main.uploaded_file', filename=producto.imagen) }}{% else %}https://placehold.co/50x50{% endif %}" class="w-12 h-12 object-cover">
             </td>
             <td class="p-2">{{ producto.nombre }}</td>
             <td class="p-2">{{ producto.categoria.nombre }}</td>

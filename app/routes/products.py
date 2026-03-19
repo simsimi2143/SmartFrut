@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from werkzeug.utils import secure_filename
 import os
+import uuid
 from app.models import Categoria, Producto
 from app.database.db import db
 from config import Config
@@ -9,7 +10,6 @@ products_bp = Blueprint('products', __name__)
 
 @products_bp.route('/')
 def listar():
-    print("Host header:", request.headers.get('Host'))
     productos = Producto.query.all()
     return render_template('gestion_productos.html', productos=productos)
 
@@ -29,23 +29,28 @@ def nuevo():
             db.session.add(categoria)
             db.session.commit()
 
-        # Guardar imagen si se subió
-        imagen_filename = None
-        if imagen and imagen.filename != '':
-            filename = secure_filename(imagen.filename)
-            # Añadir un identificador único para evitar colisiones
-            import uuid
-            unique_name = str(uuid.uuid4()) + '_' + filename
-            imagen.save(os.path.join(Config.UPLOAD_FOLDER, unique_name))
-            imagen_filename = unique_name
-
         producto = Producto(
             nombre=nombre_producto,
             precio=precio,
-            imagen=imagen_filename,
             categoria_id=categoria.id
         )
         db.session.add(producto)
+        db.session.flush()  # Para obtener el ID si es necesario
+
+        # Guardar imagen si se subió
+        if imagen and imagen.filename != '':
+            filename = secure_filename(imagen.filename)
+            unique_name = str(uuid.uuid4()) + '_' + filename
+            filepath = os.path.join(Config.UPLOAD_FOLDER, unique_name)
+            try:
+                imagen.save(filepath)
+                producto.imagen = unique_name
+                flash('Imagen guardada correctamente.', 'success')
+            except Exception as e:
+                flash(f'Error al guardar la imagen: {str(e)}', 'danger')
+                # Si quieres, puedes registrar el error en un archivo de log
+                # current_app.logger.error(f'Error saving image: {e}')
+
         db.session.commit()
         flash('Producto creado correctamente', 'success')
         return redirect(url_for('products.listar'))
@@ -76,12 +81,20 @@ def editar(id):
             if producto.imagen:
                 old_path = os.path.join(Config.UPLOAD_FOLDER, producto.imagen)
                 if os.path.exists(old_path):
-                    os.remove(old_path)
+                    try:
+                        os.remove(old_path)
+                    except Exception as e:
+                        flash(f'Error al eliminar la imagen anterior: {str(e)}', 'warning')
+            # Guardar nueva imagen
             filename = secure_filename(imagen.filename)
-            import uuid
             unique_name = str(uuid.uuid4()) + '_' + filename
-            imagen.save(os.path.join(Config.UPLOAD_FOLDER, unique_name))
-            producto.imagen = unique_name
+            filepath = os.path.join(Config.UPLOAD_FOLDER, unique_name)
+            try:
+                imagen.save(filepath)
+                producto.imagen = unique_name
+                flash('Imagen actualizada correctamente.', 'success')
+            except Exception as e:
+                flash(f'Error al guardar la imagen: {str(e)}', 'danger')
 
         db.session.commit()
         flash('Producto actualizado', 'success')
@@ -96,7 +109,10 @@ def eliminar(id):
     if producto.imagen:
         image_path = os.path.join(Config.UPLOAD_FOLDER, producto.imagen)
         if os.path.exists(image_path):
-            os.remove(image_path)
+            try:
+                os.remove(image_path)
+            except Exception as e:
+                flash(f'Error al eliminar la imagen: {str(e)}', 'warning')
     db.session.delete(producto)
     db.session.commit()
     flash('Producto eliminado', 'success')
