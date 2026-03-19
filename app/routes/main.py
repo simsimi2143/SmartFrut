@@ -24,6 +24,25 @@ def filtrar_productos():
         productos = Producto.query.all()
     return render_template('partials/productos_grid.html', productos=productos)
 
+@main_bp.route('/buscar_productos')
+def buscar_productos():
+    query = request.args.get('q', '').strip()
+    categoria_id = request.args.get('categoria_id', type=int)
+    
+    # Consulta base
+    productos_query = Producto.query
+    
+    # Filtrar por categoría si se proporciona
+    if categoria_id:
+        productos_query = productos_query.filter_by(categoria_id=categoria_id)
+    
+    # Filtrar por nombre si hay búsqueda
+    if query:
+        productos_query = productos_query.filter(Producto.nombre.ilike(f'%{query}%'))
+    
+    productos = productos_query.all()
+    return render_template('partials/productos_grid.html', productos=productos)
+
 @main_bp.route('/agregar_al_carrito', methods=['POST'])
 def agregar_al_carrito():
     data = request.get_json()

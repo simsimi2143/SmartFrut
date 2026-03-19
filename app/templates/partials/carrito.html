@@ -1,10 +1,11 @@
-<table class="w-full">
+{% if carrito and carrito|length > 0 %}
+<table class="tabla-carrito">
     <thead>
         <tr>
-            <th class="text-left">Producto</th>
-            <th class="text-left">Precio</th>
-            <th class="text-left">Cantidad</th>
-            <th class="text-left">Subtotal</th>
+            <th>Producto</th>
+            <th>Cant</th>
+            <th>Precio</th>
+            <th>Total</th>
             <th></th>
         </tr>
     </thead>
@@ -12,13 +13,27 @@
         {% for item in carrito %}
         <tr>
             <td>{{ item.nombre }}</td>
-            <td>€{{ item.precio }}</td>
             <td>
-                <button class="update-cantidad text-blue-500" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad }}">{{ item.cantidad }}</button>
+                <div class="cantidad-control">
+                    <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad - 0.1 }}" data-op="decr">-</button>
+                    <span class="cantidad-valor">{{ item.cantidad|round(2) }}</span>
+                    <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad + 0.1 }}" data-op="incr">+</button>
+                </div>
             </td>
-            <td>€{{ item.subtotal }}</td>
-            <td><button class="remove-item text-red-500" data-id="{{ item.producto_id }}"><i class="fas fa-trash"></i></button></td>
+            <td>${{ "%.0f"|format(item.precio) }}</td>
+            <td>${{ "%.0f"|format(item.subtotal) }}</td>
+            <td>
+                <button class="btn-eliminar remove-item" data-id="{{ item.producto_id }}">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+{% else %}
+<div class="text-center text-gray-500 py-8">
+    <i class="fas fa-shopping-basket text-4xl mb-2"></i>
+    <p>Carrito vacío</p>
+</div>
+{% endif %}
