@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 import os
 import uuid
@@ -10,6 +10,7 @@ products_bp = Blueprint('products', __name__)
 
 @products_bp.route('/')
 def listar():
+    # Mostrar todos los productos (activos e inactivos)
     productos = Producto.query.all()
     return render_template('gestion_productos.html', productos=productos)
 
@@ -19,8 +20,22 @@ def nuevo():
     if request.method == 'POST':
         nombre_categoria = request.form['categoria']
         nombre_producto = request.form['nombre']
-        precio = float(request.form['precio'])
+        precio = float(request.form['precio']) if request.form['precio'] else 0
         imagen = request.files.get('imagen')
+
+        # Nuevos campos
+        codigo = request.form.get('codigo')
+        codigo_barras = request.form.get('codigo_barras')
+        codigo_caja = request.form.get('codigo_caja')
+        habilitado = 'habilitado' in request.form
+        formato_venta = request.form.get('formato_venta', 'unidad')
+        stock_minimo = float(request.form.get('stock_minimo', 0))
+        stock_maximo = float(request.form.get('stock_maximo', 0))
+        nombre_ticket = request.form.get('nombre_ticket')
+        iva_incluido = 'iva_incluido' in request.form
+        costo_unitario = float(request.form.get('costo_unitario', 0))
+        costo_unitario_con_iva = float(request.form.get('costo_unitario_con_iva', 0))
+        margen_utilidad = float(request.form.get('margen_utilidad', 0))
 
         # Buscar o crear categoría
         categoria = Categoria.query.filter_by(nombre=nombre_categoria).first()
@@ -29,28 +44,36 @@ def nuevo():
             db.session.add(categoria)
             db.session.commit()
 
-        producto = Producto(
-            nombre=nombre_producto,
-            precio=precio,
-            categoria_id=categoria.id
-        )
-        db.session.add(producto)
-        db.session.flush()  # Para obtener el ID si es necesario
-
-        # Guardar imagen si se subió
+        # Guardar imagen
+        imagen_filename = None
         if imagen and imagen.filename != '':
             filename = secure_filename(imagen.filename)
             unique_name = str(uuid.uuid4()) + '_' + filename
-            filepath = os.path.join(Config.UPLOAD_FOLDER, unique_name)
             try:
-                imagen.save(filepath)
-                producto.imagen = unique_name
-                flash('Imagen guardada correctamente.', 'success')
+                imagen.save(os.path.join(Config.UPLOAD_FOLDER, unique_name))
+                imagen_filename = unique_name
             except Exception as e:
                 flash(f'Error al guardar la imagen: {str(e)}', 'danger')
-                # Si quieres, puedes registrar el error en un archivo de log
-                # current_app.logger.error(f'Error saving image: {e}')
 
+        producto = Producto(
+            nombre=nombre_producto,
+            precio=precio,
+            imagen=imagen_filename,
+            categoria_id=categoria.id,
+            codigo=codigo,
+            codigo_barras=codigo_barras,
+            codigo_caja=codigo_caja,
+            habilitado=habilitado,
+            formato_venta=formato_venta,
+            stock_minimo=stock_minimo,
+            stock_maximo=stock_maximo,
+            nombre_ticket=nombre_ticket,
+            iva_incluido=iva_incluido,
+            costo_unitario=costo_unitario,
+            costo_unitario_con_iva=costo_unitario_con_iva,
+            margen_utilidad=margen_utilidad
+        )
+        db.session.add(producto)
         db.session.commit()
         flash('Producto creado correctamente', 'success')
         return redirect(url_for('products.listar'))
@@ -64,8 +87,21 @@ def editar(id):
     if request.method == 'POST':
         nombre_categoria = request.form['categoria']
         producto.nombre = request.form['nombre']
-        producto.precio = float(request.form['precio'])
+        producto.precio = float(request.form['precio']) if request.form['precio'] else 0
         imagen = request.files.get('imagen')
+
+        producto.codigo = request.form.get('codigo')
+        producto.codigo_barras = request.form.get('codigo_barras')
+        producto.codigo_caja = request.form.get('codigo_caja')
+        producto.habilitado = 'habilitado' in request.form
+        producto.formato_venta = request.form.get('formato_venta', 'unidad')
+        producto.stock_minimo = float(request.form.get('stock_minimo', 0))
+        producto.stock_maximo = float(request.form.get('stock_maximo', 0))
+        producto.nombre_ticket = request.form.get('nombre_ticket')
+        producto.iva_incluido = 'iva_incluido' in request.form
+        producto.costo_unitario = float(request.form.get('costo_unitario', 0))
+        producto.costo_unitario_con_iva = float(request.form.get('costo_unitario_con_iva', 0))
+        producto.margen_utilidad = float(request.form.get('margen_utilidad', 0))
 
         # Categoría
         categoria = Categoria.query.filter_by(nombre=nombre_categoria).first()
@@ -77,22 +113,15 @@ def editar(id):
 
         # Imagen
         if imagen and imagen.filename != '':
-            # Eliminar imagen anterior si existe
             if producto.imagen:
                 old_path = os.path.join(Config.UPLOAD_FOLDER, producto.imagen)
                 if os.path.exists(old_path):
-                    try:
-                        os.remove(old_path)
-                    except Exception as e:
-                        flash(f'Error al eliminar la imagen anterior: {str(e)}', 'warning')
-            # Guardar nueva imagen
+                    os.remove(old_path)
             filename = secure_filename(imagen.filename)
             unique_name = str(uuid.uuid4()) + '_' + filename
-            filepath = os.path.join(Config.UPLOAD_FOLDER, unique_name)
             try:
-                imagen.save(filepath)
+                imagen.save(os.path.join(Config.UPLOAD_FOLDER, unique_name))
                 producto.imagen = unique_name
-                flash('Imagen actualizada correctamente.', 'success')
             except Exception as e:
                 flash(f'Error al guardar la imagen: {str(e)}', 'danger')
 
@@ -105,14 +134,10 @@ def editar(id):
 @products_bp.route('/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     producto = Producto.query.get_or_404(id)
-    # Eliminar imagen si existe
     if producto.imagen:
         image_path = os.path.join(Config.UPLOAD_FOLDER, producto.imagen)
         if os.path.exists(image_path):
-            try:
-                os.remove(image_path)
-            except Exception as e:
-                flash(f'Error al eliminar la imagen: {str(e)}', 'warning')
+            os.remove(image_path)
     db.session.delete(producto)
     db.session.commit()
     flash('Producto eliminado', 'success')

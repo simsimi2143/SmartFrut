@@ -6,9 +6,48 @@
     .pos-container {
         display: flex;
         gap: 1.5rem;
-        height: calc(100vh - 120px); /* Ajusta según el nav */
+        height: calc(100vh - 120px);
         min-height: 600px;
     }
+    /* Barra lateral de categorías */
+    .categorias-panel {
+        flex: 0.8;
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .categorias-lista {
+        padding: 1rem;
+        overflow-y: auto;
+    }
+    .categoria-btn {
+        width: 100%;
+        text-align: left;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        background: #f8fafc;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        color: #334155;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .categoria-btn:hover {
+        background: #e2e8f0;
+    }
+    .categoria-btn.activa {
+        background: #2d6a4f;
+        color: white;
+    }
+    .categoria-btn i {
+        margin-right: 0.5rem;
+        width: 1.25rem;
+    }
+    /* Panel de productos */
     .productos-panel {
         flex: 2;
         background: white;
@@ -54,6 +93,7 @@
         border-color: #2d6a4f;
         box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.2);
     }
+    /* Grid de productos */
     .productos-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -138,9 +178,6 @@
     .tabla-carrito td {
         padding: 0.5rem;
         border-bottom: 1px solid #cbd5e1;
-    }
-    .tabla-carrito tr:last-child td {
-        border-bottom: none;
     }
     .cantidad-control {
         display: flex;
@@ -238,7 +275,7 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
-    /* Modal para cantidad (similar al actual) */
+    /* Modal */
     #cantidad-modal {
         background: rgba(0,0,0,0.5);
         backdrop-filter: blur(4px);
@@ -255,12 +292,29 @@
 
 {% block content %}
 <div class="pos-container">
-    <!-- Panel izquierdo: Productos -->
+    <!-- Panel izquierdo: Categorías -->
+    <div class="categorias-panel">
+        <div class="panel-header">
+            <i class="fas fa-tags mr-2"></i> CATEGORÍAS
+        </div>
+        <div class="categorias-lista" id="categorias-lista">
+            <button class="categoria-btn" data-categoria="todos">
+                <i class="fas fa-th-large"></i> Todos
+            </button>
+            {% for categoria in categorias %}
+            <button class="categoria-btn" data-categoria="{{ categoria.id }}">
+                <i class="fas fa-tag"></i> {{ categoria.nombre }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Panel central: Productos -->
     <div class="productos-panel">
         <div class="panel-header">
             <i class="fas fa-apple-alt mr-2"></i> MENÚ DE PRODUCTOS
         </div>
-        <!-- NUEVO: Buscador por nombre -->
+        <!-- Buscador por nombre -->
         <div class="buscador-container">
             <input type="text" id="buscador" class="buscador-input" placeholder="Buscar producto por nombre..." autocomplete="off">
         </div>
@@ -269,7 +323,7 @@
         </div>
     </div>
 
-    <!-- Panel derecho: Carrito, Total y Teclado -->
+    <!-- Panel derecho: Carrito -->
     <div class="carrito-panel">
         <div class="panel-header">
             <i class="fas fa-shopping-cart mr-2"></i> LISTA DE COMPRAS
@@ -282,7 +336,6 @@
             <span id="total-carrito">0</span>
         </div>
         <div class="teclado" id="teclado">
-            <!-- Teclado numérico (se usa para el modal) -->
             <button class="tecla num-key">1</button>
             <button class="tecla num-key">2</button>
             <button class="tecla num-key">3</button>
@@ -300,14 +353,14 @@
             <button class="btn-pagar" id="pagar-btn">
                 <i class="fas fa-credit-card mr-2"></i> PAGAR
             </button>
-            <button class="btn-impresor" id="imprimir-btn" disabled title="Función no implementada">
+            <button class="btn-impresor" id="imprimir-btn" disabled>
                 <i class="fas fa-print"></i> TICKET
             </button>
         </div>
     </div>
 </div>
 
-<!-- Modal para ingresar cantidad (sin cambios funcionales) -->
+<!-- Modal para cantidad -->
 <div id="cantidad-modal" class="fixed inset-0 hidden items-center justify-center">
     <div class="modal-content">
         <h3 class="text-xl font-bold mb-4">Ingresar cantidad / peso (kg)</h3>

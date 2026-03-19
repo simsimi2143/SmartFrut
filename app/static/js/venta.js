@@ -4,13 +4,13 @@ let productoSeleccionadoPrecio = 0;
 const modal = document.getElementById('cantidad-modal');
 const cantidadInput = document.getElementById('cantidad-input');
 const buscador = document.getElementById('buscador');
-let categoriaActiva = ''; // '' significa todas
+let categoriaActiva = 'todos'; // 'todos' significa todas
 
 // Función para cargar productos filtrados
 function cargarProductos() {
     const query = buscador ? buscador.value : '';
     let url = `/buscar_productos?q=${encodeURIComponent(query)}`;
-    if (categoriaActiva) {
+    if (categoriaActiva && categoriaActiva !== 'todos') {
         url += `&categoria_id=${categoriaActiva}`;
     }
     fetch(url)
@@ -22,10 +22,14 @@ function cargarProductos() {
 }
 
 // Filtrar por categoría
-document.querySelectorAll('.category-filter').forEach(btn => {
+document.querySelectorAll('.categoria-btn').forEach(btn => {
     btn.addEventListener('click', function() {
-        categoriaActiva = this.dataset.categoria === 'todos' ? '' : this.dataset.categoria;
-        cargarProductos(); // recargar con la categoría seleccionada
+        // Quitar clase activa de todos
+        document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('activa'));
+        // Activar el botón actual
+        this.classList.add('activa');
+        categoriaActiva = this.dataset.categoria;
+        cargarProductos();
     });
 });
 
@@ -78,7 +82,6 @@ document.getElementById('confirmar-cantidad').addEventListener('click', function
 
 // Manejar clics en el carrito
 document.addEventListener('click', function(e) {
-    // Botones + y -
     if (e.target.closest('.update-cantidad')) {
         const btn = e.target.closest('.update-cantidad');
         const productoId = btn.dataset.id;
@@ -104,7 +107,6 @@ document.addEventListener('click', function(e) {
             }
         }
     }
-    // Botón eliminar
     if (e.target.closest('.remove-item')) {
         const btn = e.target.closest('.remove-item');
         const productoId = btn.dataset.id;
@@ -164,7 +166,10 @@ function actualizarCarritoUI(carrito, total) {
         .catch(error => console.error('Error:', error));
 }
 
-// Al cargar la página, aseguramos que el buscador y filtros funcionen
+// Activar "Todos" por defecto al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
-    // Si hay un parámetro de categoría en la URL, podríamos setearlo, pero no es necesario
+    const btnTodos = document.querySelector('.categoria-btn[data-categoria="todos"]');
+    if (btnTodos) {
+        btnTodos.classList.add('activa');
+    }
 });

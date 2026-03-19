@@ -10,7 +10,7 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/')
 def index():
     categorias = Categoria.query.all()
-    productos = Producto.query.all()
+    productos = Producto.query.filter_by(habilitado=True).all()
     if 'carrito' not in session:
         session['carrito'] = []
     return render_template('venta.html', categorias=categorias, productos=productos)
@@ -18,27 +18,24 @@ def index():
 @main_bp.route('/filtrar_productos')
 def filtrar_productos():
     categoria_id = request.args.get('categoria_id', type=int)
+    query = Producto.query.filter_by(habilitado=True)
     if categoria_id:
-        productos = Producto.query.filter_by(categoria_id=categoria_id).all()
-    else:
-        productos = Producto.query.all()
+        query = query.filter_by(categoria_id=categoria_id)
+    productos = query.all()
     return render_template('partials/productos_grid.html', productos=productos)
 
 @main_bp.route('/buscar_productos')
 def buscar_productos():
-    query = request.args.get('q', '').strip()
+    query_text = request.args.get('q', '').strip()
     categoria_id = request.args.get('categoria_id', type=int)
     
-    # Consulta base
-    productos_query = Producto.query
+    productos_query = Producto.query.filter_by(habilitado=True)
     
-    # Filtrar por categoría si se proporciona
     if categoria_id:
         productos_query = productos_query.filter_by(categoria_id=categoria_id)
     
-    # Filtrar por nombre si hay búsqueda
-    if query:
-        productos_query = productos_query.filter(Producto.nombre.ilike(f'%{query}%'))
+    if query_text:
+        productos_query = productos_query.filter(Producto.nombre.ilike(f'%{query_text}%'))
     
     productos = productos_query.all()
     return render_template('partials/productos_grid.html', productos=productos)
@@ -49,6 +46,9 @@ def agregar_al_carrito():
     producto_id = data['producto_id']
     cantidad = float(data.get('cantidad', 1))
     producto = Producto.query.get_or_404(producto_id)
+    
+    if not producto.habilitado:
+        return jsonify({'error': 'Producto no disponible'}), 400
 
     carrito = session.get('carrito', [])
     for item in carrito:
@@ -121,10 +121,27 @@ def ver_caja():
     ventas = Venta.query.order_by(Venta.fecha.desc()).all()
     return render_template('caja.html', total=total_obtenido, ventas=ventas)
 
-# Nueva ruta para servir imágenes desde UPLOAD_FOLDER
+# NUEVA RUTA: Obtener detalle de una venta específica (para el modal)
+@main_bp.route('/venta_detalle/<int:venta_id>')
+def venta_detalle(venta_id):
+    venta = Venta.query.get_or_404(venta_id)
+    detalles = []
+    for d in venta.detalles:
+        detalles.append({
+            'producto': d.producto.nombre,
+            'cantidad': d.cantidad,
+            'precio_unitario': d.precio_unitario,
+            'subtotal': d.subtotal
+        })
+    return jsonify({
+        'id': venta.id,
+        'fecha': venta.fecha.strftime('%d/%m/%Y %H:%M'),
+        'total': venta.total,
+        'detalles': detalles
+    })
+
 @main_bp.route('/uploads/<path:filename>')
 def uploaded_file(filename):
-    # Seguridad: evitar directory traversal
     if '..' in filename or filename.startswith('/'):
         abort(404)
     return send_from_directory(Config.UPLOAD_FOLDER, filename)

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Caja y Ventas{% endblock %}
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div class="max-w-6xl mx-auto">
     <h1 class="text-3xl font-bold mb-6">Resumen de Caja</h1>
     
     <div class="bg-white p-6 rounded-lg shadow-md mb-8 border-l-8 border-green-500">
@@ -16,6 +16,7 @@
                     <th class="p-4 font-bold text-gray-700">ID Venta</th>
                     <th class="p-4 font-bold text-gray-700">Fecha y Hora</th>
                     <th class="p-4 font-bold text-gray-700 text-right">Total</th>
+                    <th class="p-4 font-bold text-gray-700 text-center">Detalle</th>
                 </tr>
             </thead>
             <tbody>
@@ -24,14 +25,102 @@
                     <td class="p-4 text-gray-600">#{{ venta.id }}</td>
                     <td class="p-4 text-gray-600">{{ venta.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
                     <td class="p-4 text-right font-bold text-green-600">€{{ "%.2f"|format(venta.total) }}</td>
+                    <td class="p-4 text-center">
+                        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ver-detalle" data-venta-id="{{ venta.id }}">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="3" class="p-8 text-center text-gray-500">No hay ventas registradas aún.</td>
+                    <td colspan="4" class="p-8 text-center text-gray-500">No hay ventas registradas aún.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- Modal para mostrar detalles de la venta -->
+<div id="detalle-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full" style="z-index: 1000;">
+    <div class="relative top-20 mx-auto p-5 border w-3/4 max-w-3xl shadow-lg rounded-lg bg-white">
+        <div class="flex justify-between items-center pb-3">
+            <h3 class="text-2xl font-bold text-gray-900">Detalle de Venta <span id="modal-venta-id"></span></h3>
+            <button id="cerrar-modal" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div class="mb-4">
+            <p><strong>Fecha:</strong> <span id="modal-fecha"></span></p>
+            <p><strong>Total:</strong> €<span id="modal-total"></span></p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border p-2 text-left">Producto</th>
+                        <th class="border p-2 text-right">Cantidad</th>
+                        <th class="border p-2 text-right">Precio Unit.</th>
+                        <th class="border p-2 text-right">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-detalles-body">
+                    <!-- Se llena con JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        <div class="flex justify-end mt-4">
+            <button id="cerrar-modal-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Abrir modal y cargar datos
+    document.querySelectorAll('.ver-detalle').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const ventaId = this.dataset.ventaId;
+            fetch(`/venta_detalle/${ventaId}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('modal-venta-id').innerText = '#' + data.id;
+                    document.getElementById('modal-fecha').innerText = data.fecha;
+                    document.getElementById('modal-total').innerText = data.total.toFixed(2);
+                    
+                    const tbody = document.getElementById('modal-detalles-body');
+                    tbody.innerHTML = '';
+                    data.detalles.forEach(d => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="border p-2">${d.producto}</td>
+                            <td class="border p-2 text-right">${d.cantidad.toFixed(2)}</td>
+                            <td class="border p-2 text-right">€${d.precio_unitario.toFixed(2)}</td>
+                            <td class="border p-2 text-right">€${d.subtotal.toFixed(2)}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                    
+                    document.getElementById('detalle-modal').classList.remove('hidden');
+                })
+                .catch(error => console.error('Error:', error));
+        });
+    });
+
+    // Cerrar modal con los botones
+    function cerrarModal() {
+        document.getElementById('detalle-modal').classList.add('hidden');
+    }
+    document.getElementById('cerrar-modal').addEventListener('click', cerrarModal);
+    document.getElementById('cerrar-modal-btn').addEventListener('click', cerrarModal);
+
+    // Cerrar si se hace clic fuera del contenido
+    window.addEventListener('click', function(e) {
+        const modal = document.getElementById('detalle-modal');
+        if (e.target === modal) {
+            cerrarModal();
+        }
+    });
+</script>
 {% endblock %}
