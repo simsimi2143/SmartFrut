@@ -12,15 +12,41 @@
     <tbody>
         {% for item in carrito %}
         <tr>
-            <td>{{ item.nombre }}</td>
+            <td>
+                {{ item.nombre }}
+                <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                    {% if item.tipo_unidad == 'kg' %}
+                        <i class="fas fa-weight-hanging"></i> x kg
+                    {% else %}
+                        <i class="fas fa-box"></i> unidad
+                    {% endif %}
+                </small>
+            </td>
             <td>
                 <div class="cantidad-control">
                     <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad - 0.1 }}" data-op="decr">-</button>
-                    <span class="cantidad-valor">{{ item.cantidad|round(2) }}</span>
+                    <span class="cantidad-valor">
+                        {% if item.cantidad == item.cantidad|int %}
+                            {{ item.cantidad|int }}
+                        {% else %}
+                            {{ "%.2f"|format(item.cantidad) }}
+                        {% endif %}
+                    </span>
                     <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad + 0.1 }}" data-op="incr">+</button>
                 </div>
             </td>
-            <td>${{ "%.0f"|format(item.precio) }}</td>
+            <td>
+                <div class="precio-control">
+                    <span class="precio-simbolo">$</span>
+                    <input type="number" class="precio-input update-precio" 
+                           data-id="{{ item.producto_id }}" 
+                           value="{{ "%.0f"|format(item.precio) }}" 
+                           step="1" min="0">
+                </div>
+                {% if item.iva_incluido %}
+                <small style="display: block; color: #059669; font-size: 0.7rem;">IVA incl.</small>
+                {% endif %}
+            </td>
             <td>${{ "%.0f"|format(item.subtotal) }}</td>
             <td>
                 <button class="btn-eliminar remove-item" data-id="{{ item.producto_id }}">

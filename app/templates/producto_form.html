@@ -150,7 +150,7 @@
                 <label>Formato de venta</label>
                 <div class="radio-group">
                     <label>
-                        <input type="radio" name="formato_venta" value="kilo" {% if not producto or producto.formato_venta == 'kilo' %}checked{% endif %}> Kilo
+                        <input type="radio" name="formato_venta" value="kg" {% if not producto or producto.formato_venta == 'kg' %}checked{% endif %}> Kilo
                     </label>
                     <label>
                         <input type="radio" name="formato_venta" value="unidad" {% if producto and producto.formato_venta == 'unidad' %}checked{% endif %}> Unidad

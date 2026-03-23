@@ -4,7 +4,9 @@ let productoSeleccionadoPrecio = 0;
 const modal = document.getElementById('cantidad-modal');
 const cantidadInput = document.getElementById('cantidad-input');
 const buscador = document.getElementById('buscador');
-let categoriaActiva = 'todos'; // 'todos' significa todas
+let categoriaActiva = 'todos';
+let ultimaVentaId = null;
+let datosUltimaBoleta = null;
 
 // Función para cargar productos filtrados
 function cargarProductos() {
@@ -24,9 +26,7 @@ function cargarProductos() {
 // Filtrar por categoría
 document.querySelectorAll('.categoria-btn').forEach(btn => {
     btn.addEventListener('click', function() {
-        // Quitar clase activa de todos
         document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('activa'));
-        // Activar el botón actual
         this.classList.add('activa');
         categoriaActiva = this.dataset.categoria;
         cargarProductos();
@@ -121,6 +121,36 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// Manejar cambio de precio en el carrito
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('update-precio')) {
+        const input = e.target;
+        const productoId = input.dataset.id;
+        const nuevoPrecio = parseFloat(input.value);
+
+        if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+            alert('Ingresa un precio válido');
+            actualizarCarritoUI(null, null);
+            return;
+        }
+
+        fetch('/actualizar_precio_carrito', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ producto_id: productoId, precio: nuevoPrecio })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                actualizarCarritoUI(data.carrito, data.total);
+            }
+        })
+        .catch(error => console.error('Error al actualizar precio:', error));
+    }
+});
+
 // Teclado numérico
 document.querySelectorAll('.num-key').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -136,37 +166,285 @@ document.querySelectorAll('.num-key').forEach(btn => {
     });
 });
 
-// Pagar
+// ============================================
+// PAGAR - Procesa el pago
+// ============================================
 document.getElementById('pagar-btn').addEventListener('click', function() {
     if (confirm('¿Confirmar pago?')) {
         fetch('/pagar', { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    ultimaVentaId = data.venta_id;
+                    datosUltimaBoleta = data.boleta;
                     actualizarCarritoUI([], 0);
-                    alert('Venta registrada. Total: $' + data.total.toFixed(0));
+
+                    // Habilitar botón de impresión
+                    const imprimirBtn = document.getElementById('imprimir-btn');
+                    if (imprimirBtn) {
+                        imprimirBtn.disabled = false;
+                        imprimirBtn.dataset.ventaId = data.venta_id;
+                    }
+
+                    // Mostrar el ticket automáticamente
+                    mostrarTicketModal(data.boleta, data.impresora_detectada);
                 }
             })
             .catch(error => console.error('Error:', error));
     }
 });
 
-// Botón de impresión (placeholder)
+// ============================================
+// MODAL DEL TICKET - Funciones
+// ============================================
+
+// Mostrar el modal con el ticket
+function mostrarTicketModal(boleta, impresoraDetectada) {
+    const modal = document.getElementById('ticket-modal');
+    const contenido = document.getElementById('ticket-contenido');
+    const alertaContainer = document.getElementById('alerta-impresora-container');
+
+    // Generar HTML del ticket
+    contenido.innerHTML = generarHTMLTicket(boleta);
+
+    // Mostrar alerta si no hay impresora
+    if (!impresoraDetectada) {
+        alertaContainer.innerHTML = `
+            <div class="alerta-impresora-modal">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>No se detectó impresora térmica. Use "Imp. Sistema" para imprimir.</span>
+            </div>
+        `;
+    } else {
+        alertaContainer.innerHTML = '';
+    }
+
+    // Guardar datos para impresión
+    datosUltimaBoleta = boleta;
+
+    // Mostrar modal
+    modal.classList.add('activo');
+}
+
+// Cerrar el modal del ticket
+function cerrarTicketModal() {
+    const modal = document.getElementById('ticket-modal');
+    modal.classList.remove('activo');
+}
+
+// Generar HTML del ticket
+function generarHTMLTicket(boleta) {
+    const negocio = boleta.negocio;
+    const items = boleta.items;
+    const totales = boleta.totales;
+
+    let itemsHTML = '';
+    items.forEach(item => {
+        const cantidad = item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(2);
+        const unidadIcono = item.tipo_unidad === 'kg' ? '<i class="fas fa-weight-hanging"></i>' : '<i class="fas fa-box"></i>';
+        const unidadTexto = item.tipo_unidad === 'kg' ? 'kg' : 'unid';
+
+        itemsHTML += `
+            <tr>
+                <td>
+                    ${item.nombre}
+                    <span class="unidad-tipo">${unidadIcono} ${unidadTexto}</span>
+                </td>
+                <td style="text-align: center;">${cantidad}</td>
+                <td style="text-align: right;">
+                    $${Math.round(item.precio).toLocaleString()}
+                    ${item.iva_incluido ? '<span style="color: #059669;">*</span>' : ''}
+                </td>
+                <td style="text-align: right;">$${Math.round(item.subtotal).toLocaleString()}</td>
+            </tr>
+        `;
+    });
+
+    return `
+        <div class="ticket-header">
+            <h2>${negocio.nombre}</h2>
+            ${negocio.direccion ? `<p>${negocio.direccion}</p>` : ''}
+            ${negocio.telefono ? `<p>TEL: ${negocio.telefono}</p>` : ''}
+            ${negocio.rut ? `<p>RUT: ${negocio.rut}</p>` : ''}
+        </div>
+
+        <div class="ticket-info">
+            <p><strong>BOLETA N°:</strong> ${String(boleta.venta_id).padStart(6, '0')}</p>
+            <p><strong>FECHA:</strong> ${boleta.fecha}</p>
+            <p><strong>HORA:</strong> ${boleta.hora}</p>
+        </div>
+
+        <table class="ticket-items">
+            <thead>
+                <tr>
+                    <th>PRODUCTO</th>
+                    <th style="text-align: center;">CANT</th>
+                    <th style="text-align: right;">PRECIO</th>
+                    <th style="text-align: right;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itemsHTML}
+            </tbody>
+        </table>
+
+        <div class="ticket-totales">
+            <div class="fila-total">
+                <span>Subtotal:</span>
+                <span>$${Math.round(totales.subtotal).toLocaleString()}</span>
+            </div>
+            <div class="fila-total">
+                <span>IVA (19%):</span>
+                <span>$${Math.round(totales.iva).toLocaleString()}</span>
+            </div>
+            <div class="fila-total total-final">
+                <span>TOTAL:</span>
+                <span>$${Math.round(totales.total).toLocaleString()}</span>
+            </div>
+        </div>
+
+        <div class="ticket-footer">
+            <p><strong>GRACIAS POR SU COMPRA</strong></p>
+            <p>VUELVA PRONTO</p>
+            ${totales.items_con_iva > 0 ? '<p style="font-size: 8px; margin-top: 0.5rem;">* Precios con IVA incluido</p>' : ''}
+        </div>
+    `;
+}
+
+// ============================================
+// BOTÓN TICKET - Abre el modal
+// ============================================
 document.getElementById('imprimir-btn').addEventListener('click', function() {
-    alert('Función de impresión no implementada aún.');
+    const btn = document.getElementById('imprimir-btn');
+    const ventaId = btn.dataset.ventaId || ultimaVentaId;
+
+    if (!ventaId) {
+        alert('No hay venta para imprimir. Realice una venta primero.');
+        return;
+    }
+
+    // Cargar datos de la boleta
+    fetch(`/obtener_boleta/${ventaId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarTicketModal(data.boleta, data.impresora_detectada);
+            } else {
+                alert('Error al cargar la boleta');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar la boleta');
+        });
 });
+
+// ============================================
+// IMPRESIÓN DE BOLETA
+// ============================================
+
+// Imprimir en impresora térmica
+function imprimirBoletaTermica() {
+    if (!datosUltimaBoleta) {
+        alert('No hay boleta para imprimir');
+        return;
+    }
+
+    const btn = document.getElementById('btn-imprimir-termica');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Imprimiendo...';
+    btn.disabled = true;
+
+    fetch(`/imprimir_boleta/${datosUltimaBoleta.venta_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            // Deshabilitar botón de ticket principal
+            document.getElementById('imprimir-btn').disabled = true;
+            document.getElementById('imprimir-btn').innerHTML = '<i class="fas fa-check"></i> TICKET';
+        } else {
+            alert('⚠️ ' + data.message);
+        }
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al imprimir');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Imprimir usando impresora del sistema (navegador)
+function imprimirBoletaSistema() {
+    const contenido = document.getElementById('ticket-contenido');
+    const ventanaImpresion = window.open('', '_blank');
+
+    ventanaImpresion.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Boleta ${datosUltimaBoleta ? datosUltimaBoleta.venta_id : ''}</title>
+            <style>
+                body {
+                    font-family: 'Courier New', monospace;
+                    font-size: 11px;
+                    padding: 20px;
+                    max-width: 300px;
+                    margin: 0 auto;
+                }
+                .ticket-header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 10px; }
+                .ticket-header h2 { font-size: 16px; margin: 0 0 5px 0; }
+                .ticket-header p { margin: 2px 0; font-size: 10px; }
+                .ticket-info { margin-bottom: 10px; font-size: 10px; }
+                .ticket-info p { margin: 2px 0; }
+                table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 10px; }
+                th { border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 3px; text-align: left; }
+                td { padding: 3px; border-bottom: 1px dotted #ccc; }
+                td:last-child, th:last-child { text-align: right; }
+                .unidad-tipo { font-size: 8px; color: #666; }
+                .totales { border-top: 1px solid #333; padding-top: 5px; }
+                .fila-total { display: flex; justify-content: space-between; margin: 2px 0; }
+                .total-final { font-size: 14px; font-weight: bold; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 0; margin-top: 5px; }
+                .footer { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #333; font-size: 10px; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            ${contenido.innerHTML}
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                        window.close();
+                    }, 250);
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+
+    ventanaImpresion.document.close();
+}
 
 function actualizarCarritoUI(carrito, total) {
     fetch('/carrito_html')
         .then(response => response.text())
         .then(html => {
             document.getElementById('carrito-contenido').innerHTML = html;
-            document.getElementById('total-carrito').innerText = total.toFixed(0);
+            if (total !== null) {
+                document.getElementById('total-carrito').innerText = total.toFixed(0);
+            }
         })
         .catch(error => console.error('Error:', error));
 }
 
-// Activar "Todos" por defecto al cargar la página
+// Activar "Todos" por defecto
 document.addEventListener('DOMContentLoaded', function() {
     const btnTodos = document.querySelector('.categoria-btn[data-categoria="todos"]');
     if (btnTodos) {

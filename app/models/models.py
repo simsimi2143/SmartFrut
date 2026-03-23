@@ -19,7 +19,7 @@ class Producto(db.Model):
     codigo_barras = db.Column(db.String(100), nullable=True)
     codigo_caja = db.Column(db.String(50), nullable=True)
     habilitado = db.Column(db.Boolean, default=True)
-    formato_venta = db.Column(db.String(10), default='unidad')
+    formato_venta = db.Column(db.String(10), default='kg')  # Cambiado de 'unidad' a 'kg'
     stock_minimo = db.Column(db.Float, default=0)
     stock_maximo = db.Column(db.Float, default=0)
     stock_actual = db.Column(db.Float, default=0)

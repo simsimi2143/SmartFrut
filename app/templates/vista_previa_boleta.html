@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block title %}Vista Previa de Boleta{% endblock %}
+{% block extra_head %}
+<style>
+    .boleta-container {
+        max-width: 400px;
+        margin: 2rem auto;
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .boleta-papel {
+        background: #fffef0;
+        padding: 1.5rem;
+        border: 1px dashed #ccc;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #333;
+    }
+
+    .boleta-header {
+        text-align: center;
+        border-bottom: 2px solid #333;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .boleta-header h2 {
+        font-size: 18px;
+        font-weight: bold;
+        margin: 0 0 0.5rem 0;
+        text-transform: uppercase;
+    }
+
+    .boleta-header p {
+        margin: 0.25rem 0;
+        font-size: 11px;
+    }
+
+    .boleta-info {
+        margin-bottom: 1rem;
+        font-size: 11px;
+    }
+
+    .boleta-info p {
+        margin: 0.25rem 0;
+    }
+
+    .boleta-items {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+        font-size: 11px;
+    }
+
+    .boleta-items th {
+        border-top: 1px solid #333;
+        border-bottom: 1px solid #333;
+        padding: 0.5rem 0.25rem;
+        text-align: left;
+        font-weight: bold;
+    }
+
+    .boleta-items td {
+        padding: 0.4rem 0.25rem;
+        border-bottom: 1px dotted #ccc;
+    }
+
+    .boleta-items td:last-child,
+    .boleta-items th:last-child {
+        text-align: right;
+    }
+
+    .boleta-total {
+        border-top: 2px solid #333;
+        border-bottom: 2px solid #333;
+        padding: 0.75rem 0;
+        margin: 1rem 0;
+        text-align: center;
+        font-size: 16px;
+        font-weight: bold;
+    }
+
+    .boleta-footer {
+        text-align: center;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px dashed #333;
+        font-size: 11px;
+    }
+
+    .boleta-footer p {
+        margin: 0.25rem 0;
+    }
+
+    .acciones-boleta {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        justify-content: center;
+    }
+
+    .btn-imprimir {
+        background: #2d6a4f;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: background 0.2s;
+    }
+
+    .btn-imprimir:hover {
+        background: #1e4b3a;
+    }
+
+    .btn-volver {
+        background: #64748b;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+
+    .btn-volver:hover {
+        background: #475569;
+    }
+
+    .alerta-impresora {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .alerta-impresora i {
+        color: #f59e0b;
+        font-size: 1.5rem;
+    }
+
+    .alerta-impresora p {
+        margin: 0;
+        color: #92400e;
+    }
+
+    .opciones-impresion {
+        background: #f1f5f9;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .opciones-impresion h4 {
+        margin: 0 0 0.75rem 0;
+        font-size: 0.9rem;
+        color: #475569;
+    }
+
+    .opciones-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+
+    .opcion-impresion {
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.375rem;
+        padding: 0.75rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        color: #334155;
+    }
+
+    .opcion-impresion:hover {
+        border-color: #2d6a4f;
+        background: #f0fdf4;
+    }
+
+    .opcion-impresion i {
+        display: block;
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+        color: #2d6a4f;
+    }
+
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .boleta-papel, .boleta-papel * {
+            visibility: visible;
+        }
+        .boleta-papel {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 0;
+            box-shadow: none;
+            border: none;
+        }
+        .acciones-boleta,
+        .alerta-impresora,
+        .opciones-impresion {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="boleta-container">
+    {% if not impresora_detectada %}
+    <div class="alerta-impresora">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>No se detectó la impresora térmica</strong>
+            <p>La impresora en COM3 no está disponible. Puedes imprimir usando las opciones de abajo.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="boleta-papel" id="boleta-imprimir">
+        <div class="boleta-header">
+            <h2>{{ negocio.nombre }}</h2>
+            {% if negocio.direccion %}
+            <p>{{ negocio.direccion }}</p>
+            {% endif %}
+            {% if negocio.telefono %}
+            <p>TEL: {{ negocio.telefono }}</p>
+            {% endif %}
+            {% if negocio.rut %}
+            <p>RUT: {{ negocio.rut }}</p>
+            {% endif %}
+        </div>
+
+        <div class="boleta-info">
+            <p><strong>BOLETA N°:</strong> {{ "%06d"|format(venta_id) }}</p>
+            <p><strong>FECHA:</strong> {{ fecha.strftime('%d/%m/%Y') }}</p>
+            <p><strong>HORA:</strong> {{ fecha.strftime('%H:%M:%S') }}</p>
+        </div>
+
+        <table class="boleta-items">
+            <thead>
+                <tr>
+                    <th>PRODUCTO</th>
+                    <th style="text-align: center;">CANT</th>
+                    <th style="text-align: right;">PRECIO</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.nombre }}</td>
+                    <td style="text-align: center;">
+                        {% if item.cantidad == item.cantidad|int %}
+                            {{ item.cantidad|int }}
+                        {% else %}
+                            {{ "%.2f"|format(item.cantidad) }}
+                        {% endif %}
+                    </td>
+                    <td>${{ "%.0f"|format(item.precio) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="boleta-total">
+            TOTAL: ${{ "%.0f"|format(total) }}
+        </div>
+
+        <div class="boleta-footer">
+            <p><strong>GRACIAS POR SU COMPRA</strong></p>
+            <p>VUELVA PRONTO</p>
+        </div>
+    </div>
+
+    <div class="acciones-boleta">
+        <button class="btn-imprimir" onclick="imprimirBoleta()">
+            <i class="fas fa-print"></i>
+            Imprimir Boleta
+        </button>
+        <a href="{{ url_for('main.index') }}" class="btn-volver">
+            <i class="fas fa-arrow-left"></i>
+            Volver al Punto de Venta
+        </a>
+    </div>
+
+    {% if not impresora_detectada %}
+    <div class="opciones-impresion">
+        <h4><i class="fas fa-cog"></i> Otras opciones de impresión:</h4>
+        <div class="opciones-grid">
+            <a href="{{ url_for('main.descargar_boleta_pdf', venta_id=venta_id) }}" class="opcion-impresion">
+                <i class="fas fa-file-pdf"></i>
+                Descargar PDF
+            </a>
+            <button onclick="compartirBoleta()" class="opcion-impresion">
+                <i class="fas fa-share-alt"></i>
+                Compartir
+            </button>
+            <button onclick="enviarPorEmail()" class="opcion-impresion">
+                <i class="fas fa-envelope"></i>
+                Enviar por Email
+            </button>
+            <button onclick="window.print()" class="opcion-impresion">
+                <i class="fas fa-print"></i>
+                Impr. del Sistema
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function imprimirBoleta() {
+    // Intentar imprimir usando la API del navegador
+    window.print();
+}
+
+function compartirBoleta() {
+    if (navigator.share) {
+        navigator.share({
+            title: 'Boleta {{ negocio.nombre }} - N° {{ "%06d"|format(venta_id) }}',
+            text: `Boleta de compra - Total: $${{ total }}`,
+            url: window.location.href
+        }).catch(err => console.log('Error al compartir:', err));
+    } else {
+        // Copiar al portapapeles
+        const boletaTexto = document.getElementById('boleta-imprimir').innerText;
+        navigator.clipboard.writeText(boletaTexto).then(() => {
+            alert('Boleta copiada al portapapeles');
+        });
+    }
+}
+
+function enviarPorEmail() {
+    const boletaTexto = document.getElementById('boleta-imprimir').innerText;
+    const subject = encodeURIComponent('Boleta {{ negocio.nombre }} - N° {{ "%06d"|format(venta_id) }}');
+    const body = encodeURIComponent(boletaTexto);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+</script>
+{% endblock %}
