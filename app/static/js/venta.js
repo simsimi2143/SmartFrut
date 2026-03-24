@@ -1,453 +1,646 @@
-// Variables globales
-let productoSeleccionadoId = null;
-let productoSeleccionadoPrecio = 0;
-const modal = document.getElementById('cantidad-modal');
-const cantidadInput = document.getElementById('cantidad-input');
-const buscador = document.getElementById('buscador');
-let categoriaActiva = 'todos';
-let ultimaVentaId = null;
-let datosUltimaBoleta = null;
+// ============================================
+// SmartFrut - Punto de Venta JavaScript
+// ============================================
 
-// Función para cargar productos filtrados
-function cargarProductos() {
-    const query = buscador ? buscador.value : '';
-    let url = `/buscar_productos?q=${encodeURIComponent(query)}`;
-    if (categoriaActiva && categoriaActiva !== 'todos') {
-        url += `&categoria_id=${categoriaActiva}`;
+// Variables globales
+let productoSeleccionado = null;
+let inputBuffer = '';
+
+// ============================================
+// INICIALIZACIÓN
+// ============================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarEventListeners();
+    inicializarTeclado();
+    actualizarTotal();
+});
+
+function inicializarEventListeners() {
+    // Filtro de categorías
+    document.querySelectorAll('.categoria-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remover clase activa de todos
+            document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('activa'));
+            // Agregar clase activa al clickeado
+            this.classList.add('activa');
+            
+            const categoriaId = this.dataset.categoria;
+            filtrarProductos(categoriaId);
+        });
+    });
+
+    // Buscador por nombre
+    const buscadorNombre = document.getElementById('buscador-nombre');
+    if (buscadorNombre) {
+        buscadorNombre.addEventListener('input', debounce(function(e) {
+            const query = e.target.value;
+            const categoriaActiva = document.querySelector('.categoria-btn.activa')?.dataset.categoria;
+            
+            // Limpiar buscador de código si se escribe en nombre
+            const buscadorCodigo = document.getElementById('buscador-codigo');
+            if (query.length > 0 && buscadorCodigo) {
+                buscadorCodigo.value = '';
+            }
+            
+            buscarProductos(query, null, categoriaActiva);
+        }, 300));
     }
+
+    // Buscador por código
+    const buscadorCodigo = document.getElementById('buscador-codigo');
+    if (buscadorCodigo) {
+        buscadorCodigo.addEventListener('input', debounce(function(e) {
+            const codigo = e.target.value;
+            const categoriaActiva = document.querySelector('.categoria-btn.activa')?.dataset.categoria;
+            
+            // Limpiar buscador de nombre si se escribe en código
+            const buscadorNombre = document.getElementById('buscador-nombre');
+            if (codigo.length > 0 && buscadorNombre) {
+                buscadorNombre.value = '';
+            }
+            
+            buscarProductos(null, codigo, categoriaActiva);
+        }, 200));
+
+        // Enter para agregar rápido el primer producto
+        buscadorCodigo.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const primerProducto = document.querySelector('.producto-card');
+                if (primerProducto) {
+                    const id = primerProducto.dataset.id;
+                    const precio = parseFloat(primerProducto.dataset.precio);
+                    const nombre = primerProducto.querySelector('.producto-nombre')?.textContent || '';
+                    
+                    // Verificar si es producto por kg o unidad
+                    const tipoUnidad = primerProducto.dataset.tipoUnidad || 'unidad';
+                    
+                    if (tipoUnidad === 'kg') {
+                        mostrarModalCantidad(id, precio, nombre);
+                    } else {
+                        agregarAlCarrito(id, 1, precio);
+                    }
+                    
+                    this.value = '';
+                    this.focus();
+                }
+            }
+        });
+    }
+
+    // Botón pagar
+    const btnPagar = document.getElementById('pagar-btn');
+    if (btnPagar) {
+        btnPagar.addEventListener('click', procesarPago);
+    }
+
+    // Botón imprimir (deshabilitado por defecto hasta que haya venta)
+    const btnImprimir = document.getElementById('imprimir-btn');
+    if (btnImprimir) {
+        btnImprimir.addEventListener('click', function() {
+            const ventaId = this.dataset.ventaId;
+            if (ventaId) {
+                mostrarTicketModal(ventaId);
+            }
+        });
+    }
+
+    // Modal de cantidad
+    const btnConfirmarCantidad = document.getElementById('confirmar-cantidad');
+    if (btnConfirmarCantidad) {
+        btnConfirmarCantidad.addEventListener('click', confirmarCantidad);
+    }
+
+    const btnCancelarModal = document.getElementById('cancelar-modal');
+    if (btnCancelarModal) {
+        btnCancelarModal.addEventListener('click', cerrarModalCantidad);
+    }
+
+    // Cerrar modal al hacer clic fuera
+    const cantidadModal = document.getElementById('cantidad-modal');
+    if (cantidadModal) {
+        cantidadModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalCantidad();
+            }
+        });
+    }
+}
+
+// ============================================
+// BÚSQUEDA Y FILTRADO
+// ============================================
+
+function filtrarProductos(categoriaId) {
+    let url = '/filtrar_productos?';
+    if (categoriaId && categoriaId !== 'todos') {
+        url += `categoria_id=${categoriaId}`;
+    }
+    
     fetch(url)
-        .then(response => response.text())
+        .then(r => r.text())
         .then(html => {
             document.getElementById('productos-grid').innerHTML = html;
+            rebindAddToCart();
         })
-        .catch(error => console.error('Error al cargar productos:', error));
+        .catch(err => console.error('Error al filtrar:', err));
 }
 
-// Filtrar por categoría
-document.querySelectorAll('.categoria-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('activa'));
-        this.classList.add('activa');
-        categoriaActiva = this.dataset.categoria;
-        cargarProductos();
-    });
-});
+function buscarProductos(nombre, codigo, categoriaId) {
+    let url = '/buscar_productos?';
+    const params = [];
+    
+    if (nombre) params.push(`q=${encodeURIComponent(nombre)}`);
+    if (codigo) params.push(`codigo=${encodeURIComponent(codigo)}`);
+    if (categoriaId && categoriaId !== 'todos') params.push(`categoria_id=${categoriaId}`);
+    
+    url += params.join('&');
+    
+    fetch(url)
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('productos-grid').innerHTML = html;
+            rebindAddToCart();
+        })
+        .catch(err => console.error('Error al buscar:', err));
+}
 
-// Buscador en tiempo real
-if (buscador) {
-    buscador.addEventListener('input', function() {
-        cargarProductos();
+// ============================================
+// CARRITO - AGREGAR/ACTUALIZAR/ELIMINAR
+// ============================================
+
+function rebindAddToCart() {
+    document.querySelectorAll('.add-to-cart').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const id = this.dataset.id;
+            const precio = parseFloat(this.dataset.precio);
+            const card = this.closest('.producto-card');
+            const nombre = card?.querySelector('.producto-nombre')?.textContent || '';
+            const tipoUnidad = card?.dataset.tipoUnidad || 'unidad';
+            
+            if (tipoUnidad === 'kg') {
+                mostrarModalCantidad(id, precio, nombre);
+            } else {
+                agregarAlCarrito(id, 1, precio);
+            }
+        });
+    });
+
+    // También permitir clic en toda la card
+    document.querySelectorAll('.producto-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-agregar')) return;
+            
+            const id = this.dataset.id;
+            const precio = parseFloat(this.dataset.precio);
+            const nombre = this.querySelector('.producto-nombre')?.textContent || '';
+            const tipoUnidad = this.dataset.tipoUnidad || 'unidad';
+            
+            if (tipoUnidad === 'kg') {
+                mostrarModalCantidad(id, precio, nombre);
+            } else {
+                agregarAlCarrito(id, 1, precio);
+            }
+        });
     });
 }
 
-// Abrir modal al hacer clic en añadir
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.add-to-cart')) {
-        const btn = e.target.closest('.add-to-cart');
-        productoSeleccionadoId = btn.dataset.id;
-        productoSeleccionadoPrecio = parseFloat(btn.dataset.precio);
+function mostrarModalCantidad(productoId, precio, nombre) {
+    productoSeleccionado = { id: productoId, precio: precio, nombre: nombre };
+    const modal = document.getElementById('cantidad-modal');
+    const input = document.getElementById('cantidad-input');
+    
+    if (modal && input) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-        cantidadInput.value = 1;
-        cantidadInput.focus();
+        input.value = '';
+        input.placeholder = `Kg de ${nombre}`;
+        input.focus();
     }
-});
+}
 
-// Cancelar modal
-document.getElementById('cancelar-modal').addEventListener('click', function() {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-});
+function cerrarModalCantidad() {
+    const modal = document.getElementById('cantidad-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    productoSeleccionado = null;
+}
 
-// Confirmar cantidad
-document.getElementById('confirmar-cantidad').addEventListener('click', function() {
-    const cantidad = parseFloat(cantidadInput.value);
-    if (isNaN(cantidad) || cantidad <= 0) {
-        alert('Ingresa una cantidad válida');
+function confirmarCantidad() {
+    const input = document.getElementById('cantidad-input');
+    const cantidad = parseFloat(input.value);
+    
+    if (!cantidad || cantidad <= 0) {
+        alert('Por favor ingrese una cantidad válida');
         return;
     }
+    
+    if (productoSeleccionado) {
+        agregarAlCarrito(productoSeleccionado.id, cantidad, productoSeleccionado.precio);
+        cerrarModalCantidad();
+    }
+}
+
+function agregarAlCarrito(productoId, cantidad, precio) {
     fetch('/agregar_al_carrito', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ producto_id: productoSeleccionadoId, cantidad: cantidad })
-    })
-    .then(response => response.json())
-    .then(data => {
-        actualizarCarritoUI(data.carrito, data.total);
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    })
-    .catch(error => console.error('Error:', error));
-});
-
-// Manejar clics en el carrito
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.update-cantidad')) {
-        const btn = e.target.closest('.update-cantidad');
-        const productoId = btn.dataset.id;
-        let nuevaCantidad;
-        if (btn.dataset.op === 'incr') {
-            nuevaCantidad = parseFloat(btn.dataset.cantidad);
-        } else if (btn.dataset.op === 'decr') {
-            nuevaCantidad = parseFloat(btn.dataset.cantidad);
-        } else {
-            nuevaCantidad = prompt('Nueva cantidad:', btn.dataset.cantidad);
-        }
-        if (nuevaCantidad !== undefined && nuevaCantidad !== null) {
-            const cant = parseFloat(nuevaCantidad);
-            if (!isNaN(cant) && cant >= 0) {
-                fetch('/actualizar_carrito', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ producto_id: productoId, cantidad: cant })
-                })
-                .then(response => response.json())
-                .then(data => actualizarCarritoUI(data.carrito, data.total))
-                .catch(error => console.error('Error:', error));
-            }
-        }
-    }
-    if (e.target.closest('.remove-item')) {
-        const btn = e.target.closest('.remove-item');
-        const productoId = btn.dataset.id;
-        fetch('/actualizar_carrito', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ producto_id: productoId, cantidad: 0 })
+        body: JSON.stringify({
+            producto_id: productoId,
+            cantidad: cantidad,
+            precio: precio
         })
-        .then(response => response.json())
-        .then(data => actualizarCarritoUI(data.carrito, data.total))
-        .catch(error => console.error('Error:', error));
-    }
-});
-
-// Manejar cambio de precio en el carrito
-document.addEventListener('change', function(e) {
-    if (e.target.classList.contains('update-precio')) {
-        const input = e.target;
-        const productoId = input.dataset.id;
-        const nuevoPrecio = parseFloat(input.value);
-
-        if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
-            alert('Ingresa un precio válido');
-            actualizarCarritoUI(null, null);
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
             return;
         }
+        actualizarCarritoUI(data);
+    })
+    .catch(err => console.error('Error al agregar:', err));
+}
 
-        fetch('/actualizar_precio_carrito', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ producto_id: productoId, precio: nuevoPrecio })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                alert(data.error);
+function actualizarCarritoUI(data) {
+    fetch('/carrito_html')
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('carrito-contenido').innerHTML = html;
+            document.getElementById('total-carrito').textContent = formatearPrecio(data.total);
+            
+            // Re-bind eventos del carrito
+            rebindCarritoEvents();
+        });
+}
+
+function rebindCarritoEvents() {
+    // Botones de cantidad (+/-)
+    document.querySelectorAll('.update-cantidad').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const cantidad = parseFloat(this.dataset.cantidad);
+            
+            if (cantidad <= 0) {
+                eliminarDelCarrito(id);
             } else {
-                actualizarCarritoUI(data.carrito, data.total);
+                actualizarCantidad(id, cantidad);
             }
-        })
-        .catch(error => console.error('Error al actualizar precio:', error));
-    }
-});
+        });
+    });
 
-// Teclado numérico
-document.querySelectorAll('.num-key').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const key = this.innerText;
-        if (document.activeElement && document.activeElement.tagName === 'INPUT') {
-            const input = document.activeElement;
+    // Inputs de precio editables
+    document.querySelectorAll('.update-precio').forEach(input => {
+        input.addEventListener('change', function() {
+            const id = this.dataset.id;
+            const nuevoPrecio = parseFloat(this.value);
+            
+            if (nuevoPrecio < 0) {
+                alert('El precio no puede ser negativo');
+                this.value = this.dataset.precioOriginal || 0;
+                return;
+            }
+            
+            actualizarPrecio(id, nuevoPrecio);
+        });
+        
+        // Guardar precio original para restaurar si hay error
+        input.dataset.precioOriginal = input.value;
+    });
+
+    // Botones eliminar
+    document.querySelectorAll('.remove-item').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            if (confirm('¿Eliminar este producto del carrito?')) {
+                eliminarDelCarrito(id);
+            }
+        });
+    });
+}
+
+function actualizarCantidad(productoId, cantidad) {
+    fetch('/actualizar_carrito', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            producto_id: productoId,
+            cantidad: cantidad
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        actualizarCarritoUI(data);
+    })
+    .catch(err => console.error('Error al actualizar cantidad:', err));
+}
+
+function actualizarPrecio(productoId, precio) {
+    fetch('/actualizar_precio_carrito', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            producto_id: productoId,
+            precio: precio
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        actualizarCarritoUI(data);
+    })
+    .catch(err => console.error('Error al actualizar precio:', err));
+}
+
+function eliminarDelCarrito(productoId) {
+    fetch('/actualizar_carrito', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            producto_id: productoId,
+            cantidad: 0
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        actualizarCarritoUI(data);
+    })
+    .catch(err => console.error('Error al eliminar:', err));
+}
+
+// ============================================
+// TECLADO NUMÉRICO VIRTUAL
+// ============================================
+
+function inicializarTeclado() {
+    const teclado = document.getElementById('teclado');
+    if (!teclado) return;
+
+    teclado.addEventListener('click', function(e) {
+        if (e.target.classList.contains('num-key')) {
+            const key = e.target.textContent;
+            
             if (key === 'C') {
-                input.value = '';
+                inputBuffer = '';
             } else {
-                input.value += key;
+                inputBuffer += key;
             }
+            
+            // Aquí puedes implementar lógica adicional para el buffer
+            console.log('Buffer:', inputBuffer);
         }
     });
-});
+}
 
 // ============================================
-// PAGAR - Procesa el pago
+// PAGO Y TICKET
 // ============================================
-document.getElementById('pagar-btn').addEventListener('click', function() {
-    if (confirm('¿Confirmar pago?')) {
-        fetch('/pagar', { method: 'POST' })
-            .then(response => response.json())
+
+function procesarPago() {
+    const totalElement = document.getElementById('total-carrito');
+    const total = parseFloat(totalElement.textContent.replace(/[^\d.-]/g, ''));
+    
+    if (total <= 0) {
+        alert('No hay productos en el carrito');
+        return;
+    }
+
+    if (!confirm(`¿Confirmar venta por $${formatearPrecio(total)}?`)) {
+        return;
+    }
+
+    fetch('/pagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        // Habilitar botón de imprimir
+        const btnImprimir = document.getElementById('imprimir-btn');
+        if (btnImprimir) {
+            btnImprimir.disabled = false;
+            btnImprimir.dataset.ventaId = data.venta_id;
+        }
+        
+        // Mostrar modal del ticket
+        mostrarTicketModal(data.venta_id, data.boleta, data.impresora_detectada);
+        
+        // Limpiar carrito visualmente
+        document.getElementById('carrito-contenido').innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <i class="fas fa-shopping-basket text-4xl mb-2"></i>
+                <p>Carrito vacío</p>
+            </div>
+        `;
+        document.getElementById('total-carrito').textContent = '0';
+        
+        // Limpiar buscadores
+        const buscadorNombre = document.getElementById('buscador-nombre');
+        const buscadorCodigo = document.getElementById('buscador-codigo');
+        if (buscadorNombre) buscadorNombre.value = '';
+        if (buscadorCodigo) buscadorCodigo.value = '';
+    })
+    .catch(err => {
+        console.error('Error al procesar pago:', err);
+        alert('Error al procesar el pago');
+    });
+}
+
+// ============================================
+// MODAL DEL TICKET
+// ============================================
+
+function mostrarTicketModal(ventaId, boletaData = null, impresoraDetectada = false) {
+    const modal = document.getElementById('ticket-modal');
+    
+    if (boletaData) {
+        renderizarTicket(boletaData, impresoraDetectada);
+    } else {
+        // Obtener datos de la boleta
+        fetch(`/obtener_boleta/${ventaId}`)
+            .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    ultimaVentaId = data.venta_id;
-                    datosUltimaBoleta = data.boleta;
-                    actualizarCarritoUI([], 0);
-
-                    // Habilitar botón de impresión
-                    const imprimirBtn = document.getElementById('imprimir-btn');
-                    if (imprimirBtn) {
-                        imprimirBtn.disabled = false;
-                        imprimirBtn.dataset.ventaId = data.venta_id;
-                    }
-
-                    // Mostrar el ticket automáticamente
-                    mostrarTicketModal(data.boleta, data.impresora_detectada);
+                    renderizarTicket(data.boleta, data.impresora_detectada);
                 }
-            })
-            .catch(error => console.error('Error:', error));
+            });
     }
-});
+    
+    if (modal) {
+        modal.classList.add('activo');
+    }
+}
 
-// ============================================
-// MODAL DEL TICKET - Funciones
-// ============================================
-
-// Mostrar el modal con el ticket
-function mostrarTicketModal(boleta, impresoraDetectada) {
-    const modal = document.getElementById('ticket-modal');
-    const contenido = document.getElementById('ticket-contenido');
+function renderizarTicket(boleta, impresoraDetectada) {
+    const contenedor = document.getElementById('ticket-contenido');
     const alertaContainer = document.getElementById('alerta-impresora-container');
-
-    // Generar HTML del ticket
-    contenido.innerHTML = generarHTMLTicket(boleta);
-
+    
     // Mostrar alerta si no hay impresora
-    if (!impresoraDetectada) {
+    if (!impresoraDetectada && alertaContainer) {
         alertaContainer.innerHTML = `
             <div class="alerta-impresora-modal">
                 <i class="fas fa-exclamation-triangle"></i>
-                <span>No se detectó impresora térmica. Use "Imp. Sistema" para imprimir.</span>
+                <span>No se detectó impresora térmica en COM3</span>
             </div>
         `;
-    } else {
+    } else if (alertaContainer) {
         alertaContainer.innerHTML = '';
     }
-
-    // Guardar datos para impresión
-    datosUltimaBoleta = boleta;
-
-    // Mostrar modal
-    modal.classList.add('activo');
-}
-
-// Cerrar el modal del ticket
-function cerrarTicketModal() {
-    const modal = document.getElementById('ticket-modal');
-    modal.classList.remove('activo');
-}
-
-// Generar HTML del ticket
-function generarHTMLTicket(boleta) {
-    const negocio = boleta.negocio;
-    const items = boleta.items;
-    const totales = boleta.totales;
-
-    let itemsHTML = '';
-    items.forEach(item => {
-        const cantidad = item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(2);
-        const unidadIcono = item.tipo_unidad === 'kg' ? '<i class="fas fa-weight-hanging"></i>' : '<i class="fas fa-box"></i>';
-        const unidadTexto = item.tipo_unidad === 'kg' ? 'kg' : 'unid';
-
-        itemsHTML += `
+    
+    // Generar HTML del ticket
+    let itemsHtml = '';
+    boleta.items.forEach(item => {
+        const cantidad = item.cantidad === Math.floor(item.cantidad) 
+            ? item.cantidad 
+            : item.cantidad.toFixed(2);
+        const unidad = item.tipo_unidad === 'kg' ? 'kg' : 'un';
+        
+        itemsHtml += `
             <tr>
-                <td>
-                    ${item.nombre}
-                    <span class="unidad-tipo">${unidadIcono} ${unidadTexto}</span>
-                </td>
-                <td style="text-align: center;">${cantidad}</td>
-                <td style="text-align: right;">
-                    $${Math.round(item.precio).toLocaleString()}
-                    ${item.iva_incluido ? '<span style="color: #059669;">*</span>' : ''}
-                </td>
-                <td style="text-align: right;">$${Math.round(item.subtotal).toLocaleString()}</td>
+                <td>${item.nombre}<br><span class="unidad-tipo">(${cantidad} ${unidad} x $${Math.round(item.precio)})</span></td>
+                <td>$${Math.round(item.subtotal)}</td>
             </tr>
         `;
     });
-
-    return `
+    
+    const fecha = typeof boleta.fecha === 'string' ? boleta.fecha : new Date(boleta.fecha).toLocaleDateString('es-CL');
+    const hora = boleta.hora || new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
+    
+    contenedor.innerHTML = `
         <div class="ticket-header">
-            <h2>${negocio.nombre}</h2>
-            ${negocio.direccion ? `<p>${negocio.direccion}</p>` : ''}
-            ${negocio.telefono ? `<p>TEL: ${negocio.telefono}</p>` : ''}
-            ${negocio.rut ? `<p>RUT: ${negocio.rut}</p>` : ''}
+            <h2>${boleta.negocio.nombre}</h2>
+            ${boleta.negocio.direccion ? `<p>${boleta.negocio.direccion}</p>` : ''}
+            ${boleta.negocio.telefono ? `<p>TEL: ${boleta.negocio.telefono}</p>` : ''}
+            ${boleta.negocio.rut ? `<p>RUT: ${boleta.negocio.rut}</p>` : ''}
         </div>
-
+        
         <div class="ticket-info">
             <p><strong>BOLETA N°:</strong> ${String(boleta.venta_id).padStart(6, '0')}</p>
-            <p><strong>FECHA:</strong> ${boleta.fecha}</p>
-            <p><strong>HORA:</strong> ${boleta.hora}</p>
+            <p><strong>FECHA:</strong> ${fecha}</p>
+            <p><strong>HORA:</strong> ${hora}</p>
         </div>
-
+        
         <table class="ticket-items">
             <thead>
                 <tr>
                     <th>PRODUCTO</th>
-                    <th style="text-align: center;">CANT</th>
-                    <th style="text-align: right;">PRECIO</th>
                     <th style="text-align: right;">TOTAL</th>
                 </tr>
             </thead>
             <tbody>
-                ${itemsHTML}
+                ${itemsHtml}
             </tbody>
         </table>
-
+        
         <div class="ticket-totales">
             <div class="fila-total">
                 <span>Subtotal:</span>
-                <span>$${Math.round(totales.subtotal).toLocaleString()}</span>
+                <span>$${Math.round(boleta.totales.subtotal)}</span>
             </div>
             <div class="fila-total">
                 <span>IVA (19%):</span>
-                <span>$${Math.round(totales.iva).toLocaleString()}</span>
+                <span>$${Math.round(boleta.totales.iva)}</span>
             </div>
             <div class="fila-total total-final">
                 <span>TOTAL:</span>
-                <span>$${Math.round(totales.total).toLocaleString()}</span>
+                <span>$${Math.round(boleta.totales.total)}</span>
             </div>
         </div>
-
+        
         <div class="ticket-footer">
             <p><strong>GRACIAS POR SU COMPRA</strong></p>
             <p>VUELVA PRONTO</p>
-            ${totales.items_con_iva > 0 ? '<p style="font-size: 8px; margin-top: 0.5rem;">* Precios con IVA incluido</p>' : ''}
         </div>
     `;
+    
+    // Guardar venta_id para reimpresión
+    const btnImprimirTermica = document.getElementById('btn-imprimir-termica');
+    if (btnImprimirTermica) {
+        btnImprimirTermica.dataset.ventaId = boleta.venta_id;
+    }
 }
 
-// ============================================
-// BOTÓN TICKET - Abre el modal
-// ============================================
-document.getElementById('imprimir-btn').addEventListener('click', function() {
-    const btn = document.getElementById('imprimir-btn');
-    const ventaId = btn.dataset.ventaId || ultimaVentaId;
-
-    if (!ventaId) {
-        alert('No hay venta para imprimir. Realice una venta primero.');
-        return;
+function cerrarTicketModal() {
+    const modal = document.getElementById('ticket-modal');
+    if (modal) {
+        modal.classList.remove('activo');
     }
+}
 
-    // Cargar datos de la boleta
-    fetch(`/obtener_boleta/${ventaId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                mostrarTicketModal(data.boleta, data.impresora_detectada);
-            } else {
-                alert('Error al cargar la boleta');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error al cargar la boleta');
-        });
-});
-
-// ============================================
-// IMPRESIÓN DE BOLETA
-// ============================================
-
-// Imprimir en impresora térmica
 function imprimirBoletaTermica() {
-    if (!datosUltimaBoleta) {
-        alert('No hay boleta para imprimir');
-        return;
-    }
-
-    const btn = document.getElementById('btn-imprimir-termica');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Imprimiendo...';
-    btn.disabled = true;
-
-    fetch(`/imprimir_boleta/${datosUltimaBoleta.venta_id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+    const ventaId = document.getElementById('btn-imprimir-termica')?.dataset.ventaId;
+    if (!ventaId) return;
+    
+    fetch(`/imprimir_boleta/${ventaId}`, {
+        method: 'POST'
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert('✅ ' + data.message);
-            // Deshabilitar botón de ticket principal
-            document.getElementById('imprimir-btn').disabled = true;
-            document.getElementById('imprimir-btn').innerHTML = '<i class="fas fa-check"></i> TICKET';
+            alert('Boleta enviada a impresora térmica');
         } else {
-            alert('⚠️ ' + data.message);
+            alert(data.message || 'Error al imprimir');
         }
-        btn.innerHTML = originalText;
-        btn.disabled = false;
     })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error al imprimir');
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+    .catch(err => {
+        console.error('Error al imprimir:', err);
+        alert('Error de conexión con la impresora');
     });
 }
 
-// Imprimir usando impresora del sistema (navegador)
 function imprimirBoletaSistema() {
-    const contenido = document.getElementById('ticket-contenido');
-    const ventanaImpresion = window.open('', '_blank');
-
-    ventanaImpresion.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Boleta ${datosUltimaBoleta ? datosUltimaBoleta.venta_id : ''}</title>
-            <style>
-                body {
-                    font-family: 'Courier New', monospace;
-                    font-size: 11px;
-                    padding: 20px;
-                    max-width: 300px;
-                    margin: 0 auto;
-                }
-                .ticket-header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 10px; }
-                .ticket-header h2 { font-size: 16px; margin: 0 0 5px 0; }
-                .ticket-header p { margin: 2px 0; font-size: 10px; }
-                .ticket-info { margin-bottom: 10px; font-size: 10px; }
-                .ticket-info p { margin: 2px 0; }
-                table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 10px; }
-                th { border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 3px; text-align: left; }
-                td { padding: 3px; border-bottom: 1px dotted #ccc; }
-                td:last-child, th:last-child { text-align: right; }
-                .unidad-tipo { font-size: 8px; color: #666; }
-                .totales { border-top: 1px solid #333; padding-top: 5px; }
-                .fila-total { display: flex; justify-content: space-between; margin: 2px 0; }
-                .total-final { font-size: 14px; font-weight: bold; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 0; margin-top: 5px; }
-                .footer { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #333; font-size: 10px; }
-                @media print { body { padding: 0; } }
-            </style>
-        </head>
-        <body>
-            ${contenido.innerHTML}
-            <script>
-                window.onload = function() {
-                    setTimeout(function() {
-                        window.print();
-                        window.close();
-                    }, 250);
-                };
-            <\/script>
-        </body>
-        </html>
-    `);
-
-    ventanaImpresion.document.close();
+    window.print();
 }
 
-function actualizarCarritoUI(carrito, total) {
+// ============================================
+// UTILIDADES
+// ============================================
+
+function formatearPrecio(valor) {
+    return Math.round(valor).toLocaleString('es-CL');
+}
+
+function actualizarTotal() {
+    // Obtener total actual del servidor al cargar
     fetch('/carrito_html')
-        .then(response => response.text())
-        .then(html => {
-            document.getElementById('carrito-contenido').innerHTML = html;
-            if (total !== null) {
-                document.getElementById('total-carrito').innerText = total.toFixed(0);
-            }
-        })
-        .catch(error => console.error('Error:', error));
+        .then(r => r.text())
+        .then(() => {
+            // El total se actualiza en el HTML parcial
+        });
 }
 
-// Activar "Todos" por defecto
-document.addEventListener('DOMContentLoaded', function() {
-    const btnTodos = document.querySelector('.categoria-btn[data-categoria="todos"]');
-    if (btnTodos) {
-        btnTodos.classList.add('activa');
+// Debounce para evitar múltiples llamadas
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Cerrar modales con Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalCantidad();
+        cerrarTicketModal();
     }
 });

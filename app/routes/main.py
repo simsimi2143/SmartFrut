@@ -48,6 +48,7 @@ def filtrar_productos():
 @main_bp.route('/buscar_productos')
 def buscar_productos():
     query_text = request.args.get('q', '').strip()
+    codigo = request.args.get('codigo', '').strip()
     categoria_id = request.args.get('categoria_id', type=int)
 
     productos_query = Producto.query.filter_by(habilitado=True)
@@ -55,7 +56,17 @@ def buscar_productos():
     if categoria_id:
         productos_query = productos_query.filter_by(categoria_id=categoria_id)
 
-    if query_text:
+    # Búsqueda por código (prioritaria si se proporciona)
+    if codigo:
+        productos_query = productos_query.filter(
+            db.or_(
+                Producto.codigo.ilike(f'%{codigo}%'),
+                Producto.codigo_barras.ilike(f'%{codigo}%'),
+                Producto.codigo_caja.ilike(f'%{codigo}%')
+            )
+        )
+    # Búsqueda por nombre
+    elif query_text:
         productos_query = productos_query.filter(Producto.nombre.ilike(f'%{query_text}%'))
 
     productos = productos_query.all()

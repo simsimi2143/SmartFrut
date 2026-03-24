@@ -555,6 +555,26 @@
         max-width: 400px;
         width: 90%;
     }
+
+    /* Buscador dual */
+    .flex {
+        display: flex;
+    }
+    .gap-3 {
+        gap: 0.75rem;
+    }
+    .flex-1 {
+        flex: 1;
+    }
+    .w-48 {
+        width: 12rem;
+    }
+    .relative {
+        position: relative;
+    }
+    .pl-10 {
+        padding-left: 2.5rem;
+    }
 </style>
 {% endblock %}
 
@@ -582,9 +602,24 @@
         <div class="panel-header">
             <i class="fas fa-apple-alt mr-2"></i> MENÚ DE PRODUCTOS
         </div>
-        <!-- Buscador por nombre -->
+        <!-- Buscador dual: Nombre y Código -->
         <div class="buscador-container">
-            <input type="text" id="buscador" class="buscador-input" placeholder="Buscar producto por nombre..." autocomplete="off">
+            <div class="flex gap-3">
+                <div class="flex-1">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="buscador-nombre" class="buscador-input pl-10" 
+                               placeholder="Buscar por nombre..." autocomplete="off">
+                    </div>
+                </div>
+                <div class="w-48">
+                    <div class="relative">
+                        <i class="fas fa-barcode absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="buscador-codigo" class="buscador-input pl-10" 
+                               placeholder="Código..." autocomplete="off">
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="productos-grid" id="productos-grid">
             {% include 'partials/productos_grid.html' %}

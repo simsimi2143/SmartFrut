@@ -134,11 +134,20 @@ def editar(id):
 @products_bp.route('/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     producto = Producto.query.get_or_404(id)
+    
+    # Verificar si tiene ventas asociadas
+    if producto.detalles_venta:
+        ventas_count = len(producto.detalles_venta)
+        flash(f'No se puede eliminar: El producto tiene {ventas_count} venta(s) registrada(s). Deshabilítalo en su lugar.', 'danger')
+        return redirect(url_for('products.listar'))
+    
+    # Eliminar imagen si existe
     if producto.imagen:
         image_path = os.path.join(Config.UPLOAD_FOLDER, producto.imagen)
         if os.path.exists(image_path):
             os.remove(image_path)
+    
     db.session.delete(producto)
     db.session.commit()
-    flash('Producto eliminado', 'success')
+    flash('Producto eliminado correctamente', 'success')
     return redirect(url_for('products.listar'))
