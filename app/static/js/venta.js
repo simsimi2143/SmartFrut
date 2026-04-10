@@ -1,549 +1,534 @@
 // ============================================
-// SmartFrut - Punto de Venta JavaScript (CORREGIDO CON IVA DESGLOSADO)
+// SISTEMA DE MULTI-CARRITO PARA FRUTERÍA
 // ============================================
 
-// Variables globales
-let productoSeleccionado = null;
-let inputBuffer = '';
-const IVA_TASA = 0.19; // 19% IVA Chile
+let carritos = [];
+let carritoActivo = 0;
+let contadorClientes = 1;
 
-// ============================================
-// INICIALIZACIÓN
-// ============================================
-
+// Inicializar
 document.addEventListener('DOMContentLoaded', function() {
-    inicializarEventListeners();
-    inicializarTeclado();
-    inicializarEventDelegation();
-    actualizarTotal();
+    crearNuevoCarrito();
+    inicializarEventos();
 });
 
-function inicializarEventListeners() {
-    // Filtro de categorías
-    document.querySelectorAll('.categoria-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('activa'));
-            this.classList.add('activa');
-            const categoriaId = this.dataset.categoria;
-            filtrarProductos(categoriaId);
-        });
+function inicializarEventos() {
+    // Botón nuevo cliente
+    document.getElementById('nuevo-cliente-btn').addEventListener('click', function() {
+        crearNuevoCarrito();
     });
-
-    // Buscador por nombre
-    const buscadorNombre = document.getElementById('buscador-nombre');
-    if (buscadorNombre) {
-        buscadorNombre.addEventListener('input', debounce(function(e) {
-            const query = e.target.value;
-            const categoriaActiva = document.querySelector('.categoria-btn.activa')?.dataset.categoria;
-            const buscadorCodigo = document.getElementById('buscador-codigo');
-            if (query.length > 0 && buscadorCodigo) buscadorCodigo.value = '';
-            buscarProductos(query, null, categoriaActiva);
-        }, 300));
-    }
-
-    // Buscador por código
-    const buscadorCodigo = document.getElementById('buscador-codigo');
-    if (buscadorCodigo) {
-        buscadorCodigo.addEventListener('input', debounce(function(e) {
-            const codigo = e.target.value;
-            const categoriaActiva = document.querySelector('.categoria-btn.activa')?.dataset.categoria;
-            const buscadorNombre = document.getElementById('buscador-nombre');
-            if (codigo.length > 0 && buscadorNombre) buscadorNombre.value = '';
-            buscarProductos(null, codigo, categoriaActiva);
-        }, 200));
-
-        buscadorCodigo.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                const primerProducto = document.querySelector('.producto-card');
-                if (primerProducto) {
-                    const id = primerProducto.dataset.id;
-                    const precio = parseFloat(primerProducto.dataset.precio);
-                    const nombre = primerProducto.querySelector('.producto-nombre')?.textContent || '';
-                    const tipoUnidad = primerProducto.dataset.tipoUnidad || 'unidad';
-
-                    if (tipoUnidad === 'kg') {
-                        mostrarModalCantidad(id, precio, nombre);
-                    } else {
-                        agregarAlCarrito(id, 1, precio);
-                    }
-                    this.value = '';
-                    this.focus();
-                }
-            }
-        });
-    }
 
     // Botón pagar
-    const btnPagar = document.getElementById('pagar-btn');
-    if (btnPagar) btnPagar.addEventListener('click', procesarPago);
+    document.getElementById('pagar-btn').addEventListener('click', pagar);
 
     // Botón imprimir
-    const btnImprimir = document.getElementById('imprimir-btn');
-    if (btnImprimir) {
-        btnImprimir.addEventListener('click', function() {
-            const ventaId = this.dataset.ventaId;
-            if (ventaId) mostrarTicketModal(ventaId);
+    document.getElementById('imprimir-btn').addEventListener('click', mostrarTicketModal);
+
+    // Buscadores
+    document.getElementById('buscador-nombre').addEventListener('input', debounce(buscarProductos, 300));
+    document.getElementById('buscador-codigo').addEventListener('input', debounce(buscarPorCodigo, 300));
+
+    // Categorías
+    document.querySelectorAll('.categoria-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            filtrarPorCategoria(this.dataset.categoria);
         });
-    }
+    });
 
-    // Modal de cantidad
-    const btnConfirmarCantidad = document.getElementById('confirmar-cantidad');
-    if (btnConfirmarCantidad) btnConfirmarCantidad.addEventListener('click', confirmarCantidad);
-
-    const btnCancelarModal = document.getElementById('cancelar-modal');
-    if (btnCancelarModal) btnCancelarModal.addEventListener('click', cerrarModalCantidad);
-
-    const cantidadModal = document.getElementById('cantidad-modal');
-    if (cantidadModal) {
-        cantidadModal.addEventListener('click', function(e) {
-            if (e.target === this) cerrarModalCantidad();
+    // Teclado numérico
+    document.querySelectorAll('.num-key').forEach(btn => {
+        btn.addEventListener('click', function() {
+            manejarTecla(this.textContent);
         });
-    }
+    });
+
+    // Modal cantidad
+    document.getElementById('confirmar-cantidad').addEventListener('click', confirmarCantidad);
+    document.getElementById('cancelar-modal').addEventListener('click', cerrarModalCantidad);
 }
 
-// ============================================
-// EVENT DELEGATION
-// ============================================
+function crearNuevoCarrito() {
+    const nuevoCarrito = {
+        id: Date.now(),
+        nombre: `Cliente ${contadorClientes}`,
+        items: [],
+        horaCreacion: new Date().toLocaleTimeString(),
+        total: 0
+    };
+    
+    carritos.push(nuevoCarrito);
+    carritoActivo = carritos.length - 1;
+    contadorClientes++;
+    
+    renderizarTabs();
+    renderizarCarrito();
+    actualizarTotal();
+}
 
-function inicializarEventDelegation() {
-    const productosGrid = document.getElementById('productos-grid');
-    if (productosGrid) {
-        productosGrid.addEventListener('click', function(e) {
-            const btnAgregar = e.target.closest('.add-to-cart');
-            const card = e.target.closest('.producto-card');
-
-            if (btnAgregar) {
-                e.stopPropagation();
-                const id = btnAgregar.dataset.id;
-                const precio = parseFloat(btnAgregar.dataset.precio);
-                const tipoUnidad = btnAgregar.dataset.tipoUnidad || 'unidad';
-                const nombreCard = btnAgregar.closest('.producto-card')?.querySelector('.producto-nombre')?.textContent || '';
-
-                if (tipoUnidad === 'kg') {
-                    mostrarModalCantidad(id, precio, nombreCard);
-                } else {
-                    agregarAlCarrito(id, 1, precio);
-                }
-            } else if (card && !e.target.closest('.btn-agregar')) {
-                const id = card.dataset.id;
-                const precio = parseFloat(card.dataset.precio);
-                const nombre = card.querySelector('.producto-nombre')?.textContent || '';
-                const tipoUnidad = card.dataset.tipoUnidad || 'unidad';
-
-                if (tipoUnidad === 'kg') {
-                    mostrarModalCantidad(id, precio, nombre);
-                } else {
-                    agregarAlCarrito(id, 1, precio);
-                }
+function renderizarTabs() {
+    const container = document.getElementById('carritos-tabs');
+    container.innerHTML = '';
+    
+    carritos.forEach((carrito, index) => {
+        const tab = document.createElement('div');
+        tab.className = `carrito-tab ${index === carritoActivo ? 'activo' : ''} ${carrito.items.length > 0 ? 'con-items' : ''}`;
+        tab.innerHTML = `
+            <span>${carrito.nombre}</span>
+            ${carrito.items.length > 0 ? `<span class="contador-items">${carrito.items.length}</span>` : ''}
+            ${carritos.length > 1 ? `<button class="btn-cerrar-carrito" onclick="cerrarCarrito(${index}, event)"><i class="fas fa-times"></i></button>` : ''}
+        `;
+        
+        tab.addEventListener('click', function(e) {
+            if (!e.target.closest('.btn-cerrar-carrito')) {
+                cambiarCarrito(index);
             }
         });
-    }
-
-    const carritoContenido = document.getElementById('carrito-contenido');
-    if (carritoContenido) {
-        carritoContenido.addEventListener('click', function(e) {
-            const btnCantidad = e.target.closest('.update-cantidad');
-            if (btnCantidad) {
-                const id = btnCantidad.dataset.id;
-                const cantidad = parseFloat(btnCantidad.dataset.cantidad);
-                if (cantidad <= 0) eliminarDelCarrito(id);
-                else actualizarCantidad(id, cantidad);
-                return;
-            }
-
-            const btnEliminar = e.target.closest('.remove-item');
-            if (btnEliminar) {
-                const id = btnEliminar.dataset.id;
-                if (confirm('¿Eliminar este producto del carrito?')) eliminarDelCarrito(id);
-                return;
-            }
-        });
-
-        carritoContenido.addEventListener('change', function(e) {
-            const inputPrecio = e.target.closest('.update-precio');
-            if (inputPrecio) {
-                const id = inputPrecio.dataset.id;
-                const nuevoPrecio = parseFloat(inputPrecio.value);
-                if (nuevoPrecio < 0) {
-                    alert('El precio no puede ser negativo');
-                    inputPrecio.value = inputPrecio.dataset.precioOriginal || 0;
-                    return;
-                }
-                actualizarPrecio(id, nuevoPrecio);
-            }
-        });
-    }
-}
-
-// ============================================
-// BÚSQUEDA Y FILTRADO
-// ============================================
-
-function filtrarProductos(categoriaId) {
-    let url = '/filtrar_productos?';
-    if (categoriaId && categoriaId !== 'todos') url += `categoria_id=${categoriaId}`;
-
-    fetch(url)
-        .then(r => r.text())
-        .then(html => document.getElementById('productos-grid').innerHTML = html)
-        .catch(err => console.error('Error al filtrar:', err));
-}
-
-function buscarProductos(nombre, codigo, categoriaId) {
-    let url = '/buscar_productos?';
-    const params = [];
-    if (nombre) params.push(`q=${encodeURIComponent(nombre)}`);
-    if (codigo) params.push(`codigo=${encodeURIComponent(codigo)}`);
-    if (categoriaId && categoriaId !== 'todos') params.push(`categoria_id=${categoriaId}`);
-    url += params.join('&');
-
-    fetch(url)
-        .then(r => r.text())
-        .then(html => document.getElementById('productos-grid').innerHTML = html)
-        .catch(err => console.error('Error al buscar:', err));
-}
-
-// ============================================
-// CARRITO
-// ============================================
-
-function mostrarModalCantidad(productoId, precio, nombre) {
-    productoSeleccionado = { id: productoId, precio: precio, nombre: nombre };
-    const modal = document.getElementById('cantidad-modal');
-    const input = document.getElementById('cantidad-input');
-
-    if (modal && input) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        input.value = '';
-        input.placeholder = `Kg de ${nombre}`;
-        input.focus();
-    }
-}
-
-function cerrarModalCantidad() {
-    const modal = document.getElementById('cantidad-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    }
-    productoSeleccionado = null;
-}
-
-function confirmarCantidad() {
-    const input = document.getElementById('cantidad-input');
-    const cantidad = parseFloat(input.value);
-
-    if (!cantidad || cantidad <= 0) {
-        alert('Por favor ingrese una cantidad válida');
-        return;
-    }
-
-    if (productoSeleccionado) {
-        agregarAlCarrito(productoSeleccionado.id, cantidad, productoSeleccionado.precio);
-        cerrarModalCantidad();
-    }
-}
-
-function agregarAlCarrito(productoId, cantidad, precio) {
-    fetch('/agregar_al_carrito', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ producto_id: productoId, cantidad: cantidad, precio: precio })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.error) { alert(data.error); return; }
-        actualizarCarritoUI(data);
-    })
-    .catch(err => console.error('Error al agregar:', err));
-}
-
-function actualizarCarritoUI(data) {
-    fetch('/carrito_html')
-        .then(r => r.text())
-        .then(html => {
-            document.getElementById('carrito-contenido').innerHTML = html;
-            document.getElementById('total-carrito').textContent = formatearPrecio(data.total);
-            document.querySelectorAll('.update-precio').forEach(input => {
-                input.dataset.precioOriginal = input.value;
-            });
-        });
-}
-
-function actualizarCantidad(productoId, cantidad) {
-    fetch('/actualizar_carrito', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ producto_id: productoId, cantidad: cantidad })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.error) { alert(data.error); return; }
-        actualizarCarritoUI(data);
-    })
-    .catch(err => console.error('Error al actualizar cantidad:', err));
-}
-
-function actualizarPrecio(productoId, precio) {
-    fetch('/actualizar_precio_carrito', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ producto_id: productoId, precio: precio })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.error) { alert(data.error); return; }
-        actualizarCarritoUI(data);
-    })
-    .catch(err => console.error('Error al actualizar precio:', err));
-}
-
-function eliminarDelCarrito(productoId) {
-    fetch('/actualizar_carrito', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ producto_id: productoId, cantidad: 0 })
-    })
-    .then(r => r.json())
-    .then(data => actualizarCarritoUI(data))
-    .catch(err => console.error('Error al eliminar:', err));
-}
-
-// ============================================
-// TECLADO NUMÉRICO
-// ============================================
-
-function inicializarTeclado() {
-    const teclado = document.getElementById('teclado');
-    if (!teclado) return;
-
-    teclado.addEventListener('click', function(e) {
-        if (e.target.classList.contains('num-key')) {
-            const key = e.target.textContent;
-            if (key === 'C') inputBuffer = '';
-            else inputBuffer += key;
-            console.log('Buffer:', inputBuffer);
-        }
+        
+        container.appendChild(tab);
     });
 }
 
-// ============================================
-// PAGO Y TICKET CON IVA DESGLOSADO
-// ============================================
+function cambiarCarrito(index) {
+    carritoActivo = index;
+    renderizarTabs();
+    renderizarCarrito();
+    actualizarTotal();
+}
 
-function procesarPago() {
-    const totalElement = document.getElementById('total-carrito');
-    const total = parseFloat(totalElement.textContent.replace(/[^\d.-]/g, ''));
+function cerrarCarrito(index, event) {
+    event.stopPropagation();
+    
+    if (carritos.length <= 1) {
+        mostrarNotificacion('Debe haber al menos un carrito activo', 'error');
+        return;
+    }
+    
+    if (carritos[index].items.length > 0 && !confirm('¿Cerrar carrito con items? Se perderán los productos.')) {
+        return;
+    }
+    
+    carritos.splice(index, 1);
+    
+    if (carritoActivo >= carritos.length) {
+        carritoActivo = carritos.length - 1;
+    }
+    
+    renderizarTabs();
+    renderizarCarrito();
+    actualizarTotal();
+}
 
-    if (total <= 0) { alert('No hay productos en el carrito'); return; }
-    if (!confirm(`¿Confirmar venta por $${formatearPrecio(total)}?`)) return;
-
-    fetch('/pagar', { method: 'POST', headers: { 'Content-Type': 'application/json' }})
-    .then(r => r.json())
-    .then(data => {
-        if (data.error) { alert(data.error); return; }
-
-        const btnImprimir = document.getElementById('imprimir-btn');
-        if (btnImprimir) {
-            btnImprimir.disabled = false;
-            btnImprimir.dataset.ventaId = data.venta_id;
-        }
-
-        mostrarTicketModal(data.venta_id, data.boleta, data.impresora_detectada);
-
-        document.getElementById('carrito-contenido').innerHTML = `
+function renderizarCarrito() {
+    const carrito = carritos[carritoActivo];
+    const container = document.getElementById('carrito-contenido');
+    const titulo = document.getElementById('titulo-carrito-actual');
+    const hora = document.getElementById('hora-carrito');
+    
+    titulo.textContent = carrito.nombre;
+    hora.textContent = carrito.horaCreacion;
+    
+    if (carrito.items.length === 0) {
+        container.innerHTML = `
             <div class="text-center text-gray-500 py-8">
                 <i class="fas fa-shopping-basket text-4xl mb-2"></i>
                 <p>Carrito vacío</p>
-            </div>`;
-        document.getElementById('total-carrito').textContent = '0';
-
-        const buscadorNombre = document.getElementById('buscador-nombre');
-        const buscadorCodigo = document.getElementById('buscador-codigo');
-        if (buscadorNombre) buscadorNombre.value = '';
-        if (buscadorCodigo) buscadorCodigo.value = '';
-    })
-    .catch(err => {
-        console.error('Error al procesar pago:', err);
-        alert('Error al procesar el pago');
-    });
-}
-
-// ============================================
-// MODAL DEL TICKET CON IVA DESGLOSADO
-// ============================================
-
-function mostrarTicketModal(ventaId, boletaData = null, impresoraDetectada = false) {
-    const modal = document.getElementById('ticket-modal');
-
-    if (boletaData) {
-        renderizarTicket(boletaData, impresoraDetectada);
-    } else {
-        fetch(`/obtener_boleta/${ventaId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) renderizarTicket(data.boleta, data.impresora_detectada);
-            });
+                <small class="text-gray-400">Añade productos para comenzar</small>
+            </div>
+        `;
+        document.getElementById('imprimir-btn').disabled = true;
+        return;
     }
-
-    if (modal) modal.classList.add('activo');
-}
-
-function renderizarTicket(boleta, impresoraDetectada) {
-    const contenedor = document.getElementById('ticket-contenido');
-    const alertaContainer = document.getElementById('alerta-impresora-container');
-
-    if (!impresoraDetectada && alertaContainer) {
-        alertaContainer.innerHTML = `
-            <div class="alerta-impresora-modal">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>No se detectó impresora térmica en COM3</span>
-            </div>`;
-    } else if (alertaContainer) alertaContainer.innerHTML = '';
-
-    // Calcular totales con IVA desglosado
-    let itemsHtml = '';
-    let totalNeto = 0;
-    let totalIVA = 0;
-
-    boleta.items.forEach(item => {
-        const cantidad = item.cantidad === Math.floor(item.cantidad) ? item.cantidad : item.cantidad.toFixed(2);
-        const unidad = item.tipo_unidad === 'kg' ? 'kg' : 'un';
-
-        // Calcular IVA para este ítem
-        let precioNeto, ivaItem, subtotalNeto;
-        if (item.iva_incluido) {
-            precioNeto = item.precio / (1 + IVA_TASA);
-            ivaItem = item.precio - precioNeto;
-            subtotalNeto = item.subtotal / (1 + IVA_TASA);
-        } else {
-            precioNeto = item.precio;
-            ivaItem = item.precio * IVA_TASA;
-            subtotalNeto = item.subtotal;
-        }
-
-        totalNeto += subtotalNeto;
-        totalIVA += (item.subtotal - subtotalNeto);
-
-        itemsHtml += `
-            <tr>
-                <td class="text-center">${cantidad}</td>
-                <td>${item.nombre}</td>
-                <td class="text-right">$${Math.round(item.precio)}</td>
-                <td class="text-right">$${Math.round(item.subtotal)}</td>
-            </tr>`;
-    });
-
-    const fecha = typeof boleta.fecha === 'string' ? boleta.fecha : new Date(boleta.fecha).toLocaleDateString('es-CL');
-    const hora = boleta.hora || new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
-
-    // Formato tipo boleta fiscal chilena
-    contenedor.innerHTML = `
-        <div class="ticket-header-fiscal">
-            <h2>${boleta.negocio.nombre}</h2>
-            ${boleta.negocio.direccion ? `<p>${boleta.negocio.direccion}</p>` : ''}
-            ${boleta.negocio.telefono ? `<p>TEL: ${boleta.negocio.telefono}</p>` : ''}
-            ${boleta.negocio.rut ? `<p>R.U.T.: ${boleta.negocio.rut}</p>` : ''}
-        </div>
-
-        <div class="ticket-info-fiscal">
-            <p><strong>BOLETA ELECTRÓNICA Nro.:</strong> ${String(boleta.venta_id).padStart(6, '0')}</p>
-            <p><strong>Fecha de emisión:</strong> ${fecha}</p>
-            <p><strong>Hora:</strong> ${hora}</p>
-            <p><strong>CAJA:</strong> 0001</p>
-        </div>
-
-        <table class="ticket-items-fiscal">
+    
+    let html = `
+        <table class="tabla-carrito">
             <thead>
                 <tr>
-                    <th class="text-center">Ctd.</th>
-                    <th>Descripción</th>
-                    <th class="text-right">Precio</th>
-                    <th class="text-right">Subt.</th>
+                    <th>Producto</th>
+                    <th>Cant</th>
+                    <th>Precio</th>
+                    <th>Total</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
-                ${itemsHtml}
-            </tbody>
-        </table>
+    `;
+    
+    carrito.items.forEach((item, index) => {
+        const cantidadDisplay = item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(2);
+        
+        html += `
+            <tr>
+                <td>
+                    ${item.nombre}
+                    <small style="display: block; color: #64748b; font-size: 0.75rem;">
+                        ${item.tipo_unidad === 'kg' ? '<i class="fas fa-weight-hanging"></i> x kg' : '<i class="fas fa-box"></i> unidad'}
+                    </small>
+                </td>
+                <td>
+                    <div class="cantidad-control">
+                        <button class="cantidad-btn" onclick="actualizarCantidad(${index}, -1)">-</button>
+                        <span class="cantidad-valor">${cantidadDisplay}</span>
+                        <button class="cantidad-btn" onclick="actualizarCantidad(${index}, 1)">+</button>
+                    </div>
+                </td>
+                <td>
+                    <div class="precio-control">
+                        <span class="precio-simbolo">$</span>
+                        <input type="number" class="precio-input" 
+                               value="${Math.round(item.precio)}" 
+                               onchange="actualizarPrecio(${index}, this.value)"
+                               step="1" min="0">
+                    </div>
+                </td>
+                <td>$${Math.round(item.subtotal)}</td>
+                <td>
+                    <button class="btn-eliminar" onclick="eliminarItem(${index})">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    document.getElementById('imprimir-btn').disabled = false;
+}
 
+function actualizarCantidad(index, delta) {
+    const carrito = carritos[carritoActivo];
+    const item = carrito.items[index];
+    
+    const nuevaCantidad = item.cantidad + delta;
+    
+    if (nuevaCantidad <= 0) {
+        eliminarItem(index);
+        return;
+    }
+    
+    item.cantidad = nuevaCantidad;
+    item.subtotal = item.cantidad * item.precio;
+    
+    renderizarCarrito();
+    actualizarTotal();
+    renderizarTabs();
+}
+
+function actualizarPrecio(index, nuevoPrecio) {
+    const carrito = carritos[carritoActivo];
+    const item = carrito.items[index];
+    
+    item.precio = parseFloat(nuevoPrecio);
+    item.subtotal = item.cantidad * item.precio;
+    
+    renderizarCarrito();
+    actualizarTotal();
+}
+
+function eliminarItem(index) {
+    carritos[carritoActivo].items.splice(index, 1);
+    renderizarCarrito();
+    actualizarTotal();
+    renderizarTabs();
+}
+
+function actualizarTotal() {
+    const carrito = carritos[carritoActivo];
+    const total = carrito.items.reduce((sum, item) => sum + item.subtotal, 0);
+    carrito.total = total;
+    
+    document.getElementById('total-carrito').textContent = Math.round(total).toLocaleString();
+}
+
+// Agregar producto al carrito
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.add-to-cart');
+    if (!btn) return;
+    
+    const id = parseInt(btn.dataset.id);
+    const precio = parseFloat(btn.dataset.precio);
+    const tipoUnidad = btn.dataset.tipoUnidad;
+    const nombre = btn.closest('.producto-card').querySelector('.producto-nombre').textContent;
+    
+    if (tipoUnidad === 'kg') {
+        mostrarModalCantidad(id, nombre, precio, tipoUnidad);
+    } else {
+        agregarAlCarrito(id, nombre, precio, 1, tipoUnidad);
+    }
+});
+
+let productoPendiente = null;
+
+function mostrarModalCantidad(id, nombre, precio, tipoUnidad) {
+    productoPendiente = { id, nombre, precio, tipoUnidad };
+    document.getElementById('cantidad-modal').classList.remove('hidden');
+    document.getElementById('cantidad-modal').classList.add('flex');
+    document.getElementById('cantidad-input').value = '';
+    document.getElementById('cantidad-input').focus();
+}
+
+function confirmarCantidad() {
+    const cantidad = parseFloat(document.getElementById('cantidad-input').value);
+    
+    if (!cantidad || cantidad <= 0) {
+        mostrarNotificacion('Ingrese una cantidad válida', 'error');
+        return;
+    }
+    
+    agregarAlCarrito(
+        productoPendiente.id,
+        productoPendiente.nombre,
+        productoPendiente.precio,
+        cantidad,
+        productoPendiente.tipoUnidad
+    );
+    
+    cerrarModalCantidad();
+}
+
+function cerrarModalCantidad() {
+    document.getElementById('cantidad-modal').classList.add('hidden');
+    document.getElementById('cantidad-modal').classList.remove('flex');
+    productoPendiente = null;
+}
+
+function agregarAlCarrito(id, nombre, precio, cantidad, tipoUnidad) {
+    const carrito = carritos[carritoActivo];
+    
+    const existente = carrito.items.find(item => item.producto_id === id);
+    
+    if (existente) {
+        existente.cantidad += cantidad;
+        existente.subtotal = existente.cantidad * existente.precio;
+    } else {
+        carrito.items.push({
+            producto_id: id,
+            nombre: nombre,
+            precio: precio,
+            cantidad: cantidad,
+            subtotal: precio * cantidad,
+            tipo_unidad: tipoUnidad
+        });
+    }
+    
+    renderizarCarrito();
+    actualizarTotal();
+    renderizarTabs();
+    mostrarNotificacion(`${nombre} agregado`, 'success');
+}
+
+// Búsqueda de productos
+function buscarProductos() {
+    const query = document.getElementById('buscador-nombre').value;
+    const categoriaActiva = document.querySelector('.categoria-btn.activa')?.dataset.categoria || 'todos';
+    
+    fetch(`/buscar_productos?q=${encodeURIComponent(query)}&categoria_id=${categoriaActiva !== 'todos' ? categoriaActiva : ''}`)
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('productos-grid').innerHTML = html;
+        });
+}
+
+function buscarPorCodigo() {
+    const codigo = document.getElementById('buscador-codigo').value;
+    if (!codigo) return;
+    
+    fetch(`/buscar_productos?codigo=${encodeURIComponent(codigo)}`)
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('productos-grid').innerHTML = html;
+            // Si hay un solo resultado, agregarlo automáticamente
+            const cards = document.querySelectorAll('.producto-card');
+            if (cards.length === 1) {
+                cards[0].querySelector('.add-to-cart').click();
+                document.getElementById('buscador-codigo').value = '';
+            }
+        });
+}
+
+function filtrarPorCategoria(categoriaId) {
+    document.querySelectorAll('.categoria-btn').forEach(btn => btn.classList.remove('activa'));
+    document.querySelector(`[data-categoria="${categoriaId}"]`).classList.add('activa');
+    
+    const url = categoriaId === 'todos' ? '/filtrar_productos' : `/filtrar_productos?categoria_id=${categoriaId}`;
+    
+    fetch(url)
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('productos-grid').innerHTML = html;
+        });
+}
+
+// Teclado numérico
+let inputBuffer = '';
+
+function manejarTecla(tecla) {
+    if (tecla === 'C') {
+        inputBuffer = '';
+        return;
+    }
+    
+    inputBuffer += tecla;
+    mostrarNotificacion(inputBuffer, 'info');
+}
+
+// Pago
+function pagar() {
+    const carrito = carritos[carritoActivo];
+    
+    if (carrito.items.length === 0) {
+        mostrarNotificacion('Carrito vacío', 'error');
+        return;
+    }
+    
+    fetch('/pagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carrito: carrito.items })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            mostrarTicketModal(data.boleta, data.impresora_detectada);
+            carrito.items = [];
+            renderizarCarrito();
+            actualizarTotal();
+            renderizarTabs();
+        } else {
+            mostrarNotificacion(data.error || 'Error en el pago', 'error');
+        }
+    });
+}
+
+// Modal de ticket
+function mostrarTicketModal(boletaData, impresoraDetectada) {
+    const modal = document.getElementById('ticket-modal');
+    const contenido = document.getElementById('ticket-contenido');
+    const alertaContainer = document.getElementById('alerta-impresora-container');
+    
+    // Construir HTML del ticket
+    let itemsHtml = '';
+    boletaData.items.forEach(item => {
+        const cant = item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(2);
+        itemsHtml += `
+            <tr>
+                <td>${item.nombre}</td>
+                <td style="text-align: center;">${cant} ${item.tipo_unidad === 'kg' ? 'kg' : 'un'}</td>
+                <td style="text-align: right;">$${Math.round(item.precio)}</td>
+            </tr>
+        `;
+    });
+    
+    contenido.innerHTML = `
+        <div class="ticket-header-fiscal">
+            <h2>${boletaData.negocio.nombre}</h2>
+            ${boletaData.negocio.direccion ? `<p>${boletaData.negocio.direccion}</p>` : ''}
+            ${boletaData.negocio.telefono ? `<p>TEL: ${boletaData.negocio.telefono}</p>` : ''}
+            ${boletaData.negocio.rut ? `<p>RUT: ${boletaData.negocio.rut}</p>` : ''}
+        </div>
+        <div class="ticket-info-fiscal">
+            <p><strong>BOLETA N°:</strong> ${String(boletaData.venta_id).padStart(6, '0')}</p>
+            <p><strong>FECHA:</strong> ${boletaData.fecha}</p>
+            <p><strong>HORA:</strong> ${boletaData.hora}</p>
+        </div>
+        <table class="ticket-items-fiscal">
+            <thead>
+                <tr>
+                    <th>PRODUCTO</th>
+                    <th style="text-align: center;">CANT</th>
+                    <th style="text-align: right;">PRECIO</th>
+                </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+        </table>
         <div class="ticket-totales-fiscal">
-            <div class="fila-total-fiscal total-final-fiscal">
-                <span>TOTAL</span>
-                <span>$${Math.round(boleta.totales.total).toLocaleString('es-CL')}</span>
+            <div class="fila-total-fiscal">
+                <span>Subtotal:</span>
+                <span>$${Math.round(boletaData.totales.subtotal)}</span>
             </div>
             <div class="fila-total-fiscal">
-                <span>EFECTIVO</span>
-                <span>$${Math.round(boleta.totales.total).toLocaleString('es-CL')}</span>
+                <span>IVA (19%):</span>
+                <span>$${Math.round(boletaData.totales.iva)}</span>
+            </div>
+            <div class="fila-total-fiscal total-final-fiscal">
+                <span>TOTAL:</span>
+                <span>$${Math.round(boletaData.totales.total)}</span>
             </div>
         </div>
-
         <div class="ticket-iva-fiscal">
-            <p>El iva de esta boleta es $ ${Math.round(totalIVA).toLocaleString('es-CL')}</p>
+            ${boletaData.totales.items_con_iva > 0 ? 'Precios incluyen IVA' : 'IVA incluido en el total'}
         </div>
-
         <div class="ticket-footer-fiscal">
             <p><strong>GRACIAS POR SU COMPRA</strong></p>
             <p>VUELVA PRONTO</p>
         </div>
     `;
-
-    const btnImprimirTermica = document.getElementById('btn-imprimir-termica');
-    if (btnImprimirTermica) btnImprimirTermica.dataset.ventaId = boleta.venta_id;
+    
+    // Alerta de impresora
+    if (!impresoraDetectada) {
+        alertaContainer.innerHTML = `
+            <div class="alerta-impresora-modal">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>No se detectó impresora térmica en COM3</span>
+            </div>
+        `;
+    } else {
+        alertaContainer.innerHTML = '';
+    }
+    
+    modal.classList.add('activo');
 }
 
 function cerrarTicketModal() {
-    const modal = document.getElementById('ticket-modal');
-    if (modal) modal.classList.remove('activo');
+    document.getElementById('ticket-modal').classList.remove('activo');
 }
 
 function imprimirBoletaTermica() {
-    const ventaId = document.getElementById('btn-imprimir-termica')?.dataset.ventaId;
-    if (!ventaId) return;
-
-    fetch(`/imprimir_boleta/${ventaId}`, { method: 'POST' })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) alert('Boleta enviada a impresora térmica');
-        else alert(data.message || 'Error al imprimir');
-    })
-    .catch(err => {
-        console.error('Error al imprimir:', err);
-        alert('Error de conexión con la impresora');
-    });
+    // Implementar llamada al backend para imprimir
+    mostrarNotificacion('Enviando a impresora térmica...', 'info');
 }
 
 function imprimirBoletaSistema() {
     window.print();
 }
 
-// ============================================
-// UTILIDADES
-// ============================================
-
-function formatearPrecio(valor) {
-    return Math.round(valor).toLocaleString('es-CL');
-}
-
-function actualizarTotal() {
-    fetch('/carrito_html')
-        .then(r => r.text())
-        .then(() => {});
-}
-
+// Utilidades
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
-        const later = () => { clearTimeout(timeout); func(...args); };
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
 }
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        cerrarModalCantidad();
-        cerrarTicketModal();
-    }
-});
+function mostrarNotificacion(mensaje, tipo = 'info') {
+    // Remover notificación anterior si existe
+    const anterior = document.querySelector('.notificacion-toast');
+    if (anterior) anterior.remove();
+    
+    const notificacion = document.createElement('div');
+    notificacion.className = `notificacion-toast ${tipo}`;
+    
+    const iconos = {
+        success: 'fa-check-circle',
+        error: 'fa-exclamation-circle',
+        info: 'fa-info-circle'
+    };
+    
+    notificacion.innerHTML = `
+        <i class="fas ${iconos[tipo] || iconos.info}"></i>
+        <span>${mensaje}</span>
+    `;
+    
+    document.body.appendChild(notificacion);
+    
+    setTimeout(() => notificacion.classList.add('mostrar'), 10);
+    setTimeout(() => {
+        notificacion.classList.remove('mostrar');
+        setTimeout(() => notificacion.remove(), 300);
+    }, 3000);
+}

@@ -158,7 +158,8 @@ def carrito_html():
 @main_bp.route('/pagar', methods=['POST'])
 def pagar():
     """Procesa el pago, guarda la venta y genera datos de la boleta."""
-    carrito = session.get('carrito', [])
+    data = request.get_json()
+    carrito = data.get('carrito', [])  # Recibe carrito del frontend
     if not carrito:
         return jsonify({'error': 'Carrito vacío'}), 400
 
