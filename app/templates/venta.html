@@ -2,14 +2,17 @@
 {% block title %}Punto de Venta{% endblock %}
 {% block extra_head %}
 <style>
-    /* Estilos personalizados para el POS */
+    /* ============================================
+       ESTILOS POS - Sistema de Punto de Venta
+       ============================================ */
     .pos-container {
         display: flex;
         gap: 1.5rem;
         height: calc(100vh - 120px);
         min-height: 600px;
     }
-    /* Barra lateral de categorías */
+
+    /* Paneles */
     .categorias-panel {
         flex: 0.8;
         background: white;
@@ -19,35 +22,6 @@
         display: flex;
         flex-direction: column;
     }
-    .categorias-lista {
-        padding: 1rem;
-        overflow-y: auto;
-    }
-    .categoria-btn {
-        width: 100%;
-        text-align: left;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        background: #f8fafc;
-        border: none;
-        border-radius: 0.5rem;
-        font-weight: 500;
-        color: #334155;
-        transition: all 0.2s;
-        cursor: pointer;
-    }
-    .categoria-btn:hover {
-        background: #e2e8f0;
-    }
-    .categoria-btn.activa {
-        background: #2d6a4f;
-        color: white;
-    }
-    .categoria-btn i {
-        margin-right: 0.5rem;
-        width: 1.25rem;
-    }
-    /* Panel de productos */
     .productos-panel {
         flex: 2;
         background: white;
@@ -66,6 +40,8 @@
         flex-direction: column;
         overflow: hidden;
     }
+
+    /* Headers */
     .panel-header {
         background: #2d6a4f;
         color: white;
@@ -74,6 +50,29 @@
         font-size: 1.25rem;
         letter-spacing: 0.025em;
     }
+
+    /* Categorías */
+    .categorias-lista {
+        padding: 1rem;
+        overflow-y: auto;
+    }
+    .categoria-btn {
+        width: 100%;
+        text-align: left;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        background: #f8fafc;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        color: #334155;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .categoria-btn:hover { background: #e2e8f0; }
+    .categoria-btn.activa { background: #2d6a4f; color: white; }
+    .categoria-btn i { margin-right: 0.5rem; width: 1.25rem; }
+
     /* Buscador */
     .buscador-container {
         padding: 0.75rem 1rem;
@@ -93,6 +92,7 @@
         border-color: #2d6a4f;
         box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.2);
     }
+
     /* Grid de productos */
     .productos-grid {
         display: grid;
@@ -151,9 +151,8 @@
         cursor: pointer;
         transition: background 0.2s;
     }
-    .btn-agregar:hover {
-        background: #1e4b3a;
-    }
+    .btn-agregar:hover { background: #1e4b3a; }
+
     /* Carrito */
     .carrito-content {
         flex: 1;
@@ -193,10 +192,7 @@
         font-weight: bold;
         cursor: pointer;
     }
-    .cantidad-valor {
-        min-width: 40px;
-        text-align: center;
-    }
+    .cantidad-valor { min-width: 40px; text-align: center; }
     .btn-eliminar {
         color: #b91c1c;
         background: none;
@@ -214,10 +210,9 @@
         font-size: 1.5rem;
         font-weight: bold;
     }
-    .total-panel span:last-child {
-        color: #fbbf24;
-        font-size: 2rem;
-    }
+    .total-panel span:last-child { color: #fbbf24; font-size: 2rem; }
+
+    /* Teclado */
     .teclado {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -236,13 +231,10 @@
         cursor: pointer;
         transition: background 0.2s;
     }
-    .tecla:active {
-        background: #cbd5e1;
-    }
-    .tecla.operacion {
-        background: #f97316;
-        color: white;
-    }
+    .tecla:active { background: #cbd5e1; }
+    .tecla.operacion { background: #f97316; color: white; }
+
+    /* Acciones */
     .acciones {
         display: flex;
         gap: 0.5rem;
@@ -271,21 +263,15 @@
         font-weight: bold;
         cursor: pointer;
     }
-    .btn-impresor:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+    .btn-impresor:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Estilos para el input de precio editable */
+    /* Input de precio */
     .precio-control {
         display: flex;
         align-items: center;
         gap: 0.25rem;
     }
-    .precio-simbolo {
-        font-weight: 600;
-        color: #0f172a;
-    }
+    .precio-simbolo { font-weight: 600; color: #0f172a; }
     .precio-input {
         width: 70px;
         padding: 0.25rem 0.5rem;
@@ -298,10 +284,7 @@
         background: white;
         transition: all 0.2s;
     }
-    .precio-input:hover {
-        border-color: #2d6a4f;
-        background: #f0fdf4;
-    }
+    .precio-input:hover { border-color: #2d6a4f; background: #f0fdf4; }
     .precio-input:focus {
         outline: none;
         border-color: #2d6a4f;
@@ -310,7 +293,7 @@
     }
 
     /* ============================================
-       MODAL DEL TICKET - SE ABRE DENTRO DE LA VENTANA
+       MODAL DEL TICKET - FORMATO BOLETA FISCAL
        ============================================ */
     #ticket-modal {
         position: fixed;
@@ -323,15 +306,12 @@
         justify-content: center;
         padding: 2rem;
     }
-
-    #ticket-modal.activo {
-        display: flex;
-    }
+    #ticket-modal.activo { display: flex; }
 
     .ticket-modal-content {
         background: white;
         border-radius: 1rem;
-        max-width: 450px;
+        max-width: 400px;
         width: 100%;
         max-height: 90vh;
         overflow: hidden;
@@ -348,12 +328,7 @@
         justify-content: space-between;
         align-items: center;
     }
-
-    .ticket-modal-header h3 {
-        margin: 0;
-        font-size: 1.25rem;
-    }
-
+    .ticket-modal-header h3 { margin: 0; font-size: 1.25rem; }
     .ticket-modal-header .btn-cerrar {
         background: none;
         border: none;
@@ -371,109 +346,121 @@
         background: #f8fafc;
     }
 
+    /* ============================================
+       ESTILOS BOLETA FISCAL CHILENA
+       ============================================ */
     .ticket-papel {
         background: #fffef0;
         padding: 1.5rem;
-        border: 1px dashed #ccc;
-        font-family: 'Courier New', monospace;
-        font-size: 11px;
-        line-height: 1.4;
-        color: #333;
+        border: 1px solid #ddd;
+        font-family: 'Courier New', 'Monaco', monospace;
+        font-size: 12px;
+        line-height: 1.3;
+        color: #000;
     }
 
-    .ticket-header {
+    /* Header fiscal */
+    .ticket-header-fiscal {
         text-align: center;
-        border-bottom: 2px solid #333;
-        padding-bottom: 0.75rem;
-        margin-bottom: 0.75rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #000;
     }
-
-    .ticket-header h2 {
+    .ticket-header-fiscal h2 {
         font-size: 16px;
         font-weight: bold;
         margin: 0 0 0.25rem 0;
         text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .ticket-header-fiscal p {
+        margin: 0.1rem 0;
+        font-size: 11px;
+        line-height: 1.2;
     }
 
-    .ticket-header p {
+    /* Info fiscal */
+    .ticket-info-fiscal {
+        margin-bottom: 1rem;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+    .ticket-info-fiscal p {
         margin: 0.15rem 0;
-        font-size: 10px;
     }
 
-    .ticket-info {
-        margin-bottom: 0.75rem;
-        font-size: 10px;
-    }
-
-    .ticket-info p {
-        margin: 0.15rem 0;
-    }
-
-    .ticket-items {
+    /* Tabla de items fiscal */
+    .ticket-items-fiscal {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 0.75rem;
-        font-size: 10px;
+        margin-bottom: 1rem;
+        font-size: 11px;
     }
-
-    .ticket-items th {
-        border-top: 1px solid #333;
-        border-bottom: 1px solid #333;
-        padding: 0.35rem 0.15rem;
+    .ticket-items-fiscal thead {
+        border-top: 1px solid #000;
+        border-bottom: 1px solid #000;
+    }
+    .ticket-items-fiscal th {
+        padding: 0.4rem 0.2rem;
         text-align: left;
         font-weight: bold;
+        text-transform: uppercase;
+        font-size: 10px;
     }
-
-    .ticket-items td {
-        padding: 0.3rem 0.15rem;
-        border-bottom: 1px dotted #ccc;
+    .ticket-items-fiscal td {
+        padding: 0.3rem 0.2rem;
+        border-bottom: 1px dotted #999;
         vertical-align: top;
     }
+    .ticket-items-fiscal .text-center { text-align: center; }
+    .ticket-items-fiscal .text-right { text-align: right; }
 
-    .ticket-items td:last-child,
-    .ticket-items th:last-child {
-        text-align: right;
-    }
-
-    .ticket-items .unidad-tipo {
-        font-size: 9px;
-        color: #666;
-    }
-
-    .ticket-totales {
-        border-top: 1px solid #333;
+    /* Totales fiscal */
+    .ticket-totales-fiscal {
+        margin-top: 1rem;
         padding-top: 0.5rem;
-        margin: 0.5rem 0;
-        font-size: 10px;
+        border-top: 1px solid #000;
     }
-
-    .ticket-totales .fila-total {
+    .fila-total-fiscal {
         display: flex;
         justify-content: space-between;
-        margin: 0.15rem 0;
+        align-items: baseline;
+        margin: 0.2rem 0;
+        font-size: 12px;
     }
-
-    .ticket-totales .total-final {
-        font-size: 14px;
+    .total-final-fiscal {
+        font-size: 18px;
         font-weight: bold;
-        border-top: 2px solid #333;
-        border-bottom: 2px solid #333;
-        padding: 0.35rem 0;
-        margin-top: 0.35rem;
+        border-top: 1px solid #000;
+        border-bottom: 1px solid #000;
+        padding: 0.4rem 0;
+        margin: 0.5rem 0;
     }
 
-    .ticket-footer {
+    /* IVA fiscal */
+    .ticket-iva-fiscal {
         text-align: center;
-        margin-top: 0.75rem;
+        margin: 0.75rem 0;
+        padding: 0.5rem 0;
+        font-size: 11px;
+        border-top: 1px dashed #999;
+        border-bottom: 1px dashed #999;
+    }
+    .ticket-iva-fiscal p { margin: 0; }
+
+    /* Footer fiscal */
+    .ticket-footer-fiscal {
+        text-align: center;
+        margin-top: 1rem;
         padding-top: 0.5rem;
-        border-top: 1px dashed #333;
-        font-size: 10px;
+        font-size: 11px;
+        line-height: 1.3;
+    }
+    .ticket-footer-fiscal p {
+        margin: 0.1rem 0;
     }
 
-    .ticket-footer p {
-        margin: 0.15rem 0;
-    }
-
+    /* Modal footer */
     .ticket-modal-footer {
         padding: 1rem 1.5rem;
         background: white;
@@ -482,11 +469,10 @@
         gap: 0.75rem;
         flex-wrap: wrap;
     }
-
     .ticket-modal-footer button,
     .ticket-modal-footer a {
         flex: 1;
-        min-width: 120px;
+        min-width: 100px;
         padding: 0.75rem 1rem;
         border: none;
         border-radius: 0.5rem;
@@ -499,33 +485,12 @@
         gap: 0.5rem;
         text-decoration: none;
     }
-
-    .btn-ticket-imprimir {
-        background: #2d6a4f;
-        color: white;
-    }
-
-    .btn-ticket-imprimir:hover {
-        background: #1e4b3a;
-    }
-
-    .btn-ticket-cerrar {
-        background: #64748b;
-        color: white;
-    }
-
-    .btn-ticket-cerrar:hover {
-        background: #475569;
-    }
-
-    .btn-ticket-sistema {
-        background: #f59e0b;
-        color: white;
-    }
-
-    .btn-ticket-sistema:hover {
-        background: #d97706;
-    }
+    .btn-ticket-imprimir { background: #2d6a4f; color: white; }
+    .btn-ticket-imprimir:hover { background: #1e4b3a; }
+    .btn-ticket-cerrar { background: #64748b; color: white; }
+    .btn-ticket-cerrar:hover { background: #475569; }
+    .btn-ticket-sistema { background: #f59e0b; color: white; }
+    .btn-ticket-sistema:hover { background: #d97706; }
 
     .alerta-impresora-modal {
         background: #fef3c7;
@@ -538,12 +503,9 @@
         gap: 0.5rem;
         font-size: 0.85rem;
     }
+    .alerta-impresora-modal i { color: #f59e0b; }
 
-    .alerta-impresora-modal i {
-        color: #f59e0b;
-    }
-
-    /* Modal para cantidad */
+    /* Modal cantidad */
     #cantidad-modal {
         background: rgba(0,0,0,0.5);
         backdrop-filter: blur(4px);
@@ -556,25 +518,13 @@
         width: 90%;
     }
 
-    /* Buscador dual */
-    .flex {
-        display: flex;
-    }
-    .gap-3 {
-        gap: 0.75rem;
-    }
-    .flex-1 {
-        flex: 1;
-    }
-    .w-48 {
-        width: 12rem;
-    }
-    .relative {
-        position: relative;
-    }
-    .pl-10 {
-        padding-left: 2.5rem;
-    }
+    /* Utilidades */
+    .flex { display: flex; }
+    .gap-3 { gap: 0.75rem; }
+    .flex-1 { flex: 1; }
+    .w-48 { width: 12rem; }
+    .relative { position: relative; }
+    .pl-10 { padding-left: 2.5rem; }
 </style>
 {% endblock %}
 
@@ -602,7 +552,6 @@
         <div class="panel-header">
             <i class="fas fa-apple-alt mr-2"></i> MENÚ DE PRODUCTOS
         </div>
-        <!-- Buscador dual: Nombre y Código -->
         <div class="buscador-container">
             <div class="flex gap-3">
                 <div class="flex-1">
@@ -675,9 +624,7 @@
     </div>
 </div>
 
-<!-- ============================================
-     MODAL DEL TICKET - SE MUESTRA DENTRO DE LA VENTANA
-     ============================================ -->
+<!-- Modal del Ticket -->
 <div id="ticket-modal">
     <div class="ticket-modal-content">
         <div class="ticket-modal-header">
@@ -687,7 +634,7 @@
         <div class="ticket-modal-body">
             <div id="alerta-impresora-container"></div>
             <div class="ticket-papel" id="ticket-contenido">
-                <!-- El contenido del ticket se carga dinámicamente -->
+                <!-- Contenido dinámico -->
             </div>
         </div>
         <div class="ticket-modal-footer">

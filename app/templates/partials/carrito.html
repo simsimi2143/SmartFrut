@@ -24,7 +24,7 @@
             </td>
             <td>
                 <div class="cantidad-control">
-                    <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad - 0.1 }}" data-op="decr">-</button>
+                    <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad - 1 }}" data-op="decr">-</button>
                     <span class="cantidad-valor">
                         {% if item.cantidad == item.cantidad|int %}
                             {{ item.cantidad|int }}
@@ -32,7 +32,7 @@
                             {{ "%.2f"|format(item.cantidad) }}
                         {% endif %}
                     </span>
-                    <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad + 0.1 }}" data-op="incr">+</button>
+                    <button class="cantidad-btn update-cantidad" data-id="{{ item.producto_id }}" data-cantidad="{{ item.cantidad + 1 }}" data-op="incr">+</button>
                 </div>
             </td>
             <td>

@@ -1,9 +1,15 @@
 {% for producto in productos %}
-<div class="producto-card" data-id="{{ producto.id }}" data-precio="{{ producto.precio }}">
+<div class="producto-card" 
+     data-id="{{ producto.id }}" 
+     data-precio="{{ producto.precio }}"
+     data-tipo-unidad="{{ producto.formato_venta or 'unidad' }}">
     <img src="{% if producto.imagen %}{{ url_for('main.uploaded_file', filename=producto.imagen) }}{% else %}https://placehold.co/80x80{% endif %}" alt="{{ producto.nombre }}">
     <div class="producto-nombre">{{ producto.nombre }}</div>
     <div class="producto-precio">${{ "%.0f"|format(producto.precio) }}</div>
-    <button class="btn-agregar add-to-cart" data-id="{{ producto.id }}" data-precio="{{ producto.precio }}">
+    <button class="btn-agregar add-to-cart" 
+            data-id="{{ producto.id }}" 
+            data-precio="{{ producto.precio }}"
+            data-tipo-unidad="{{ producto.formato_venta or 'unidad' }}">
         <i class="fas fa-cart-plus mr-1"></i> AÑADIR
     </button>
 </div>
