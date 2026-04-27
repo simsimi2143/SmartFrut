@@ -14,3 +14,33 @@
     </button>
 </div>
 {% endfor %}
+
+<!-- Controles de paginación -->
+{% if pagination.pages > 1 %}
+<div class="paginacion">
+    <div class="paginacion-info">
+        Página {{ pagination.page }} de {{ pagination.pages }}
+    </div>
+    <div class="paginacion-botones">
+        {% if pagination.has_prev %}
+        <button class="btn-pagina" data-page="{{ pagination.prev_num }}">
+            <i class="fas fa-chevron-left"></i> Anterior
+        </button>
+        {% else %}
+        <button class="btn-pagina disabled" disabled>
+            <i class="fas fa-chevron-left"></i> Anterior
+        </button>
+        {% endif %}
+
+        {% if pagination.has_next %}
+        <button class="btn-pagina" data-page="{{ pagination.next_num }}">
+            Siguiente <i class="fas fa-chevron-right"></i>
+        </button>
+        {% else %}
+        <button class="btn-pagina disabled" disabled>
+            Siguiente <i class="fas fa-chevron-right"></i>
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

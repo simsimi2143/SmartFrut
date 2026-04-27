@@ -19,6 +19,7 @@ main_bp = Blueprint('main', __name__)
 # CONFIGURACIÓN DE IVA
 # ============================================
 IVA_TASA = 0.19  # 19% IVA en Chile
+PER_PAGE = 8
 
 def calcular_precio_con_iva(precio_sin_iva):
     """Calcula el precio con IVA incluido"""
@@ -31,10 +32,18 @@ def calcular_iva_desde_total(total):
 @main_bp.route('/')
 def index():
     categorias = Categoria.query.all()
-    productos = Producto.query.filter_by(habilitado=True).all()
+    # Paginación de productos activos (página 1 inicial)
+    page = request.args.get('page', 1, type=int)
+    pagination = Producto.query.filter_by(habilitado=True).paginate(
+        page=page, per_page=PER_PAGE, error_out=False
+    )
+    productos = pagination.items
     if 'carrito' not in session:
         session['carrito'] = []
-    return render_template('venta.html', categorias=categorias, productos=productos)
+    return render_template('venta.html',
+                           categorias=categorias,
+                           productos=productos,
+                           pagination=pagination)
 
 @main_bp.route('/filtrar_productos')
 def filtrar_productos():
@@ -49,12 +58,9 @@ def filtrar_productos():
 def buscar_productos():
     query_text = request.args.get('q', '').strip()
     codigo = request.args.get('codigo', '').strip()
-    categoria_id = request.args.get('categoria_id', type=int)
+    page = request.args.get('page', 1, type=int)
 
     productos_query = Producto.query.filter_by(habilitado=True)
-
-    if categoria_id:
-        productos_query = productos_query.filter_by(categoria_id=categoria_id)
 
     # Búsqueda por código (prioritaria si se proporciona)
     if codigo:
@@ -69,8 +75,13 @@ def buscar_productos():
     elif query_text:
         productos_query = productos_query.filter(Producto.nombre.ilike(f'%{query_text}%'))
 
-    productos = productos_query.all()
-    return render_template('partials/productos_grid.html', productos=productos)
+    pagination = productos_query.paginate(page=page, per_page=PER_PAGE, error_out=False)
+    productos = pagination.items
+
+    # Devolvemos el partial incluyendo los controles de paginación
+    return render_template('partials/productos_grid.html',
+                           productos=productos,
+                           pagination=pagination)
 
 @main_bp.route('/agregar_al_carrito', methods=['POST'])
 def agregar_al_carrito():

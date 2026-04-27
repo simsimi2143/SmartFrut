@@ -3,7 +3,7 @@
 {% block extra_head %}
 <style>
     /* ============================================
-       ESTILOS POS - MULTI-CARRITO
+       ESTILOS POS - MULTI-CARRITO (SIN SIDEBAR NI TECLADO)
        ============================================ */
     .pos-container {
         display: flex;
@@ -13,17 +13,8 @@
     }
 
     /* Paneles */
-    .categorias-panel {
-        flex: 0.8;
-        background: white;
-        border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-    }
     .productos-panel {
-        flex: 2;
+        flex: 2.8;
         background: white;
         border-radius: 1rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -168,28 +159,6 @@
         color: #6b7280;
         font-size: 0.75rem;
     }
-
-    /* Categorías */
-    .categorias-lista {
-        padding: 1rem;
-        overflow-y: auto;
-    }
-    .categoria-btn {
-        width: 100%;
-        text-align: left;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        background: #f8fafc;
-        border: none;
-        border-radius: 0.5rem;
-        font-weight: 500;
-        color: #334155;
-        transition: all 0.2s;
-        cursor: pointer;
-    }
-    .categoria-btn:hover { background: #e2e8f0; }
-    .categoria-btn.activa { background: #2d6a4f; color: white; }
-    .categoria-btn i { margin-right: 0.5rem; width: 1.25rem; }
 
     /* Buscador */
     .buscador-container {
@@ -371,28 +340,6 @@
         border-color: #2d6a4f;
         box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
     }
-
-    /* Teclado */
-    .teclado {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.5rem;
-        padding: 1rem;
-        background: #e2e8f0;
-    }
-    .tecla {
-        background: white;
-        border: none;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        font-size: 1.25rem;
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-    .tecla:active { background: #cbd5e1; }
-    .tecla.operacion { background: #f97316; color: white; }
 
     /* Acciones */
     .acciones {
@@ -627,6 +574,45 @@
         max-width: 400px;
         width: 90%;
     }
+        /* Paginación */
+    .paginacion {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: #f1f5f9;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.875rem;
+    }
+    .paginacion-info {
+        color: #475569;
+        font-weight: 500;
+    }
+    .paginacion-botones {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .btn-pagina {
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.375rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #334155;
+        transition: all 0.2s;
+    }
+    .btn-pagina:hover:not(.disabled) {
+        background: #2d6a4f;
+        color: white;
+        border-color: #2d6a4f;
+    }
+    .btn-pagina.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #e2e8f0;
+    }
 
     /* Utilidades */
     .flex { display: flex; }
@@ -642,24 +628,7 @@
 
 {% block content %}
 <div class="pos-container">
-    <!-- Panel izquierdo: Categorías -->
-    <div class="categorias-panel">
-        <div class="panel-header">
-            <i class="fas fa-tags mr-2"></i> CATEGORÍAS
-        </div>
-        <div class="categorias-lista" id="categorias-lista">
-            <button class="categoria-btn" data-categoria="todos">
-                <i class="fas fa-th-large"></i> Todos
-            </button>
-            {% for categoria in categorias %}
-            <button class="categoria-btn" data-categoria="{{ categoria.id }}">
-                <i class="fas fa-tag"></i> {{ categoria.nombre }}
-            </button>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- Panel central: Productos -->
+    <!-- Panel central: Productos (ampliado) -->
     <div class="productos-panel">
         <div class="panel-header">
             <i class="fas fa-apple-alt mr-2"></i> MENÚ DE PRODUCTOS
@@ -720,22 +689,6 @@
         <div class="total-panel">
             <span>TOTAL $</span>
             <span id="total-carrito">0</span>
-        </div>
-
-        <!-- Teclado -->
-        <div class="teclado" id="teclado">
-            <button class="tecla num-key">1</button>
-            <button class="tecla num-key">2</button>
-            <button class="tecla num-key">3</button>
-            <button class="tecla num-key">4</button>
-            <button class="tecla num-key">5</button>
-            <button class="tecla num-key">6</button>
-            <button class="tecla num-key">7</button>
-            <button class="tecla num-key">8</button>
-            <button class="tecla num-key">9</button>
-            <button class="tecla num-key">0</button>
-            <button class="tecla num-key">.</button>
-            <button class="tecla operacion num-key">C</button>
         </div>
 
         <!-- Acciones -->

@@ -1,10 +1,13 @@
 // ============================================
 // SISTEMA DE MULTI-CARRITO PARA FRUTERÍA
+// (Sin panel de categorías ni teclado, con paginación)
 // ============================================
 
 let carritos = [];
 let carritoActivo = 0;
 let contadorClientes = 1;
+let currentSearchQuery = '';
+let currentSearchCodigo = '';
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', function() {
@@ -24,27 +27,57 @@ function inicializarEventos() {
     // Botón imprimir
     document.getElementById('imprimir-btn').addEventListener('click', mostrarTicketModal);
 
-    // Buscadores
-    document.getElementById('buscador-nombre').addEventListener('input', debounce(buscarProductos, 300));
-    document.getElementById('buscador-codigo').addEventListener('input', debounce(buscarPorCodigo, 300));
+    // Buscador por nombre (SE CORRIGE EL ACCESO AL VALOR)
+    const inputNombre = document.getElementById('buscador-nombre');
+    const inputCodigo = document.getElementById('buscador-codigo');
 
-    // Categorías
-    document.querySelectorAll('.categoria-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            filtrarPorCategoria(this.dataset.categoria);
-        });
-    });
+    inputNombre.addEventListener('input', debounce(function() {
+        currentSearchQuery = inputNombre.value;
+        currentSearchCodigo = '';
+        inputCodigo.value = '';
+        cargarProductos(1);
+    }, 300));
 
-    // Teclado numérico
-    document.querySelectorAll('.num-key').forEach(btn => {
-        btn.addEventListener('click', function() {
-            manejarTecla(this.textContent);
-        });
+    // Buscador por código (SE CORRIGE EL ACCESO AL VALOR)
+    inputCodigo.addEventListener('input', debounce(function() {
+        currentSearchCodigo = inputCodigo.value;
+        currentSearchQuery = '';
+        inputNombre.value = '';
+        cargarProductos(1);
+    }, 300));
+
+    // Paginación delegada
+    document.getElementById('productos-grid').addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-pagina');
+        if (btn && !btn.disabled) {
+            const page = parseInt(btn.dataset.page);
+            if (page) {
+                cargarProductos(page);
+            }
+        }
     });
 
     // Modal cantidad
     document.getElementById('confirmar-cantidad').addEventListener('click', confirmarCantidad);
     document.getElementById('cancelar-modal').addEventListener('click', cerrarModalCantidad);
+}
+
+function cargarProductos(page = 1) {
+    let url = '/buscar_productos?page=' + page;
+    if (currentSearchQuery) {
+        url += '&q=' + encodeURIComponent(currentSearchQuery);
+    } else if (currentSearchCodigo) {
+        url += '&codigo=' + encodeURIComponent(currentSearchCodigo);
+    }
+
+    fetch(url)
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('productos-grid').innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Error al cargar productos:', err);
+        });
 }
 
 function crearNuevoCarrito() {
@@ -317,61 +350,6 @@ function agregarAlCarrito(id, nombre, precio, cantidad, tipoUnidad) {
     mostrarNotificacion(`${nombre} agregado`, 'success');
 }
 
-// Búsqueda de productos
-function buscarProductos() {
-    const query = document.getElementById('buscador-nombre').value;
-    const categoriaActiva = document.querySelector('.categoria-btn.activa')?.dataset.categoria || 'todos';
-    
-    fetch(`/buscar_productos?q=${encodeURIComponent(query)}&categoria_id=${categoriaActiva !== 'todos' ? categoriaActiva : ''}`)
-        .then(r => r.text())
-        .then(html => {
-            document.getElementById('productos-grid').innerHTML = html;
-        });
-}
-
-function buscarPorCodigo() {
-    const codigo = document.getElementById('buscador-codigo').value;
-    if (!codigo) return;
-    
-    fetch(`/buscar_productos?codigo=${encodeURIComponent(codigo)}`)
-        .then(r => r.text())
-        .then(html => {
-            document.getElementById('productos-grid').innerHTML = html;
-            // Si hay un solo resultado, agregarlo automáticamente
-            const cards = document.querySelectorAll('.producto-card');
-            if (cards.length === 1) {
-                cards[0].querySelector('.add-to-cart').click();
-                document.getElementById('buscador-codigo').value = '';
-            }
-        });
-}
-
-function filtrarPorCategoria(categoriaId) {
-    document.querySelectorAll('.categoria-btn').forEach(btn => btn.classList.remove('activa'));
-    document.querySelector(`[data-categoria="${categoriaId}"]`).classList.add('activa');
-    
-    const url = categoriaId === 'todos' ? '/filtrar_productos' : `/filtrar_productos?categoria_id=${categoriaId}`;
-    
-    fetch(url)
-        .then(r => r.text())
-        .then(html => {
-            document.getElementById('productos-grid').innerHTML = html;
-        });
-}
-
-// Teclado numérico
-let inputBuffer = '';
-
-function manejarTecla(tecla) {
-    if (tecla === 'C') {
-        inputBuffer = '';
-        return;
-    }
-    
-    inputBuffer += tecla;
-    mostrarNotificacion(inputBuffer, 'info');
-}
-
 // Pago
 function pagar() {
     const carrito = carritos[carritoActivo];
@@ -406,7 +384,6 @@ function mostrarTicketModal(boletaData, impresoraDetectada) {
     const contenido = document.getElementById('ticket-contenido');
     const alertaContainer = document.getElementById('alerta-impresora-container');
     
-    // Construir HTML del ticket
     let itemsHtml = '';
     boletaData.items.forEach(item => {
         const cant = item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(2);
@@ -464,7 +441,6 @@ function mostrarTicketModal(boletaData, impresoraDetectada) {
         </div>
     `;
     
-    // Alerta de impresora
     if (!impresoraDetectada) {
         alertaContainer.innerHTML = `
             <div class="alerta-impresora-modal">
@@ -484,7 +460,6 @@ function cerrarTicketModal() {
 }
 
 function imprimirBoletaTermica() {
-    // Implementar llamada al backend para imprimir
     mostrarNotificacion('Enviando a impresora térmica...', 'info');
 }
 
@@ -506,7 +481,6 @@ function debounce(func, wait) {
 }
 
 function mostrarNotificacion(mensaje, tipo = 'info') {
-    // Remover notificación anterior si existe
     const anterior = document.querySelector('.notificacion-toast');
     if (anterior) anterior.remove();
     
